@@ -1,36 +1,13 @@
-const { SECTORS, getSectorSymbols, getStock, getStockSectors } = require("../data/sectors");
 const { analyzeSymbol, analyzeByHorizon, buildMetrics } = require("./analysisEngine");
 const fugleClient = require("./fugleClient");
-
-function getSectors() {
-  return SECTORS;
-}
-
-function getSectorById(id) {
-  return SECTORS.find((sector) => sector.id === id);
-}
-
-async function getSectorAnalysis(sectorId, horizon) {
-  const sector = getSectorById(sectorId) || SECTORS[0];
-  const uniqueSymbols = [...new Set(getSectorSymbols(sector.id))];
-  const items = await Promise.all(uniqueSymbols.map((symbol) => analyzeSymbol(symbol, horizon)));
-  const ranked = items.sort((left, right) => right.analysis.score - left.analysis.score);
-
-  return {
-    sector: {
-      id: sector.id,
-      label: sector.label,
-      description: sector.description,
-      color: sector.color,
-      sourceType: sector.sourceType,
-      totalSymbols: uniqueSymbols.length
-    },
-    horizon,
-    generatedAt: new Date().toISOString(),
-    dataSource: items.some((item) => item.metrics.errorHint) ? "fallback+fugle" : "fugle",
-    stocks: ranked
-  };
-}
+const {
+  getUniverse,
+  getSectorsWithCounts,
+  getSectorSymbols,
+  getStock,
+  getStockSectors,
+  getFallbackStockSectorsSafe
+} = require("./stockUniverseService");
 
 function lastRow(rows) {
   return rows && rows.length ? rows[rows.length - 1] : null;
@@ -38,9 +15,7 @@ function lastRow(rows) {
 
 function pickIndicatorSeries(rows, keyMap) {
   return (rows || []).map((row) => {
-    const mapped = {
-      date: row.date
-    };
+    const mapped = { date: row.date };
     Object.entries(keyMap).forEach(([from, to]) => {
       mapped[to] = row[from];
     });
@@ -62,37 +37,51 @@ function tail(rows, count) {
   return rows.slice(-Math.max(1, Math.min(rows.length, count)));
 }
 
-async function getStockDetail(symbol) {
+async function getSectors() {
+  return getSectorsWithCounts();
+}
+
+async function getSectorAnalysis(sectorId, horizon) {
+  const sectors = await getSectorsWithCounts();
+  const sector = sectors.find((item) => item.id === sectorId) || sectors[0];
+  const uniqueSymbols = [...new Set(await getSectorSymbols(sector.id))];
+  const items = await Promise.all(uniqueSymbols.map(async (symbol) => {
+    const stock = await getStock(symbol);
+    return analyzeSymbol(symbol, horizon, { name: stock?.name || symbol });
+  }));
+  const ranked = items.sort((left, right) => right.analysis.score - left.analysis.score);
+
+  return {
+    sector: {
+      id: sector.id,
+      label: sector.label,
+      description: sector.description,
+      color: sector.color,
+      sourceType: sector.sourceType,
+      totalSymbols: uniqueSymbols.length
+    },
+    horizon,
+    generatedAt: new Date().toISOString(),
+    dataSource: items.some((item) => item.metrics.errorHint) ? "fallback+fugle" : "fugle",
+    stocks: ranked
+  };
+}
+
+function buildTimelineWindows(candleRows, macdRows, kdjRows) {
   const periods = {
-    "1d": { daysBack: 1, timeframe: "D" },
-    "3d": { daysBack: 7, timeframe: "D" },
-    "5d": { daysBack: 10, timeframe: "D" },
-    "1m": { daysBack: 35, timeframe: "D" },
-    "3m": { daysBack: 100, timeframe: "D" },
-    "6m": { daysBack: 200, timeframe: "D" },
-    "1y": { daysBack: 370, timeframe: "D" }
+    "1d": { points: 1 },
+    "3d": { points: 3 },
+    "5d": { points: 5 },
+    "1m": { points: 22 },
+    "3m": { points: 66 },
+    "6m": { points: 132 },
+    "1y": { points: 264 }
   };
 
-  const stockMeta = getStock(symbol);
-  const metrics = await buildMetrics(symbol);
-  const [quote, candles, macd, kdj] = await Promise.all([
-    fugleClient.getQuote(symbol),
-    fugleClient.getHistoricalCandles(symbol, { daysBack: 370 }),
-    fugleClient.getMACD(symbol, { daysBack: 200 }),
-    fugleClient.getKDJ(symbol, { daysBack: 200 })
-  ]);
-
-  const candleRows = candles?.data || [];
-  const macdRows = macd?.data || [];
-  const kdjRows = kdj?.data || [];
-  const latestCandle = lastRow(candleRows);
-  const latestMacd = lastRow(macdRows);
-  const latestKdj = lastRow(kdjRows);
-
-  const windows = Object.entries(periods).reduce((accumulator, [key, value]) => {
-    const subset = tail(candleRows, value.daysBack);
-    const macdSubset = tail(macdRows, value.daysBack);
-    const kdjSubset = tail(kdjRows, value.daysBack);
+  return Object.entries(periods).reduce((accumulator, [key, value]) => {
+    const subset = tail(candleRows, value.points);
+    const macdSubset = tail(macdRows, value.points);
+    const kdjSubset = tail(kdjRows, value.points);
     const latestWindowMacd = lastRow(macdSubset);
     const latestWindowKdj = lastRow(kdjSubset);
     accumulator[key] = {
@@ -109,6 +98,46 @@ async function getStockDetail(symbol) {
     };
     return accumulator;
   }, {});
+}
+
+async function getStockDetail(symbolInput) {
+  const symbol = String(symbolInput || "").trim();
+  if (!/^\d{4}$/.test(symbol)) {
+    const error = new Error("Invalid stock symbol");
+    error.status = 400;
+    throw error;
+  }
+
+  const stockMeta = await getStock(symbol);
+  const metrics = await buildMetrics(symbol);
+  const [quote, candles, macd, kdj, universe] = await Promise.all([
+    fugleClient.getQuote(symbol),
+    fugleClient.getHistoricalCandles(symbol, { daysBack: 370 }),
+    fugleClient.getMACD(symbol, { daysBack: 200 }),
+    fugleClient.getKDJ(symbol, { daysBack: 200 }),
+    getUniverse()
+  ]);
+
+  const candleRows = candles?.data || [];
+  const macdRows = macd?.data || [];
+  const kdjRows = kdj?.data || [];
+  const latestCandle = lastRow(candleRows);
+  const latestMacd = lastRow(macdRows);
+  const latestKdj = lastRow(kdjRows);
+
+  if (!stockMeta && !quote && candleRows.length === 0) {
+    const error = new Error("Stock symbol not found");
+    error.status = 404;
+    throw error;
+  }
+
+  const sectors = await getStockSectors(symbol);
+  const windows = buildTimelineWindows(candleRows, macdRows, kdjRows);
+  const horizonScores = {
+    short: analyzeByHorizon(metrics, "short"),
+    mid: analyzeByHorizon(metrics, "mid"),
+    long: analyzeByHorizon(metrics, "long")
+  };
 
   return {
     symbol,
@@ -116,7 +145,8 @@ async function getStockDetail(symbol) {
       name: stockMeta?.name || quote?.name || symbol,
       market: stockMeta?.market || null,
       industry: stockMeta?.industry || null,
-      sectors: getStockSectors(symbol)
+      sectors: sectors.length ? sectors : getFallbackStockSectorsSafe(symbol),
+      universeSource: universe.source
     },
     quote: {
       name: stockMeta?.name || quote?.name || symbol,
@@ -142,11 +172,7 @@ async function getStockDetail(symbol) {
         j: latestKdj.j
       } : null
     },
-    horizonScores: {
-      short: analyzeByHorizon(metrics, "short"),
-      mid: analyzeByHorizon(metrics, "mid"),
-      long: analyzeByHorizon(metrics, "long")
-    },
+    horizonScores,
     windows,
     series: {
       candles: pickIndicatorSeries(candleRows, { close: "close", volume: "volume" }),

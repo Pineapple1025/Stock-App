@@ -47,19 +47,36 @@ const elements = {
   indicatorSnapshot: document.querySelector("#indicatorSnapshot"),
   windowTable: document.querySelector("#windowTable"),
   detailBullishReasons: document.querySelector("#detailBullishReasons"),
-  detailRiskReasons: document.querySelector("#detailRiskReasons")
+  detailRiskReasons: document.querySelector("#detailRiskReasons"),
+  priceChart: document.querySelector("#priceChart"),
+  indicatorChart: document.querySelector("#indicatorChart"),
+  detailState: document.querySelector("#detailState")
 };
 
 async function fetchJson(url) {
   const response = await fetch(url);
+  const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    const message = body.message || `Request failed: ${response.status}`;
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
-  return response.json();
+  return body;
 }
 
 function stars(count) {
-  return "★".repeat(count) + "☆".repeat(5 - count);
+  return String.fromCharCode(9733).repeat(count) + String.fromCharCode(9734).repeat(5 - count);
+}
+
+function formatNumber(value) {
+  return value === null || value === undefined || Number.isNaN(value)
+    ? "-"
+    : Number(value).toLocaleString("zh-TW", { maximumFractionDigits: 2 });
+}
+
+function setDetailState(message) {
+  elements.detailState.textContent = message || "";
 }
 
 function renderSectorTabs() {
@@ -154,16 +171,91 @@ function renderStocks(result) {
     card.addEventListener("click", () => {
       elements.stockSymbolInput.value = stock.symbol;
       loadStockDetail(stock.symbol);
+      document.querySelector(".detail-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
 
     elements.stockList.appendChild(fragment);
   });
 }
 
-function formatNumber(value) {
-  return value === null || value === undefined || Number.isNaN(value)
-    ? "-"
-    : Number(value).toLocaleString("zh-TW", { maximumFractionDigits: 2 });
+function polylinePoints(values, width, height, padding) {
+  if (!values.length) {
+    return "";
+  }
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+
+  return values.map((value, index) => {
+    const x = padding + (index * (width - padding * 2)) / Math.max(1, values.length - 1);
+    const y = height - padding - ((value - min) / range) * (height - padding * 2);
+    return `${x},${y}`;
+  }).join(" ");
+}
+
+function renderPriceChart(detail) {
+  const candles = detail.series.candles.slice(-60);
+  if (!candles.length) {
+    elements.priceChart.innerHTML = "<p>No price series available.</p>";
+    return;
+  }
+
+  const width = 640;
+  const height = 220;
+  const padding = 20;
+  const closes = candles.map((item) => Number(item.close)).filter(Number.isFinite);
+  const volumes = candles.map((item) => Number(item.volume)).filter(Number.isFinite);
+  const points = polylinePoints(closes, width, height, padding);
+  const volumeMax = Math.max(...volumes, 1);
+
+  const bars = candles.map((item, index) => {
+    const x = padding + (index * (width - padding * 2)) / Math.max(1, candles.length - 1);
+    const barWidth = 4;
+    const value = Number(item.volume) || 0;
+    const barHeight = (value / volumeMax) * 60;
+    const y = height - padding - barHeight;
+    return `<rect x="${x - barWidth / 2}" y="${y}" width="${barWidth}" height="${barHeight}" fill="rgba(44,105,209,0.18)" rx="2" />`;
+  }).join("");
+
+  elements.priceChart.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Price and volume chart">
+      <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.12)" />
+      ${bars}
+      <polyline fill="none" stroke="#0b6e69" stroke-width="3" points="${points}" />
+    </svg>
+  `;
+}
+
+function renderIndicatorChart(detail) {
+  const macdRows = detail.series.macd.slice(-60);
+  const kdjRows = detail.series.kdj.slice(-60);
+  if (!macdRows.length && !kdjRows.length) {
+    elements.indicatorChart.innerHTML = "<p>No indicator series available.</p>";
+    return;
+  }
+
+  const width = 640;
+  const height = 220;
+  const padding = 20;
+  const macdLine = macdRows.map((item) => Number(item.macdLine)).filter(Number.isFinite);
+  const signalLine = macdRows.map((item) => Number(item.signalLine)).filter(Number.isFinite);
+  const kLine = kdjRows.map((item) => Number(item.k)).filter(Number.isFinite);
+  const dLine = kdjRows.map((item) => Number(item.d)).filter(Number.isFinite);
+  const macdPoints = polylinePoints(macdLine, width, height, padding);
+  const signalPoints = polylinePoints(signalLine, width, height, padding);
+  const kPoints = polylinePoints(kLine, width, height, padding);
+  const dPoints = polylinePoints(dLine, width, height, padding);
+
+  elements.indicatorChart.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="MACD and KDJ chart">
+      <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.12)" />
+      <polyline fill="none" stroke="#d46a1f" stroke-width="2.5" points="${macdPoints}" />
+      <polyline fill="none" stroke="#2c69d1" stroke-width="2.5" points="${signalPoints}" />
+      <polyline fill="none" stroke="#0b6e69" stroke-width="2" points="${kPoints}" />
+      <polyline fill="none" stroke="#7a445f" stroke-width="2" points="${dPoints}" />
+    </svg>
+  `;
 }
 
 function renderDetail(detail) {
@@ -271,6 +363,34 @@ function renderDetail(detail) {
     `;
     elements.windowTable.appendChild(node);
   });
+
+  renderPriceChart(detail);
+  renderIndicatorChart(detail);
+  setDetailState(`Universe source: ${detail.profile.universeSource}`);
+}
+
+function renderDetailError(message) {
+  elements.detailTitle.textContent = "Stock detail unavailable";
+  elements.detailDateLabel.textContent = "Error";
+  elements.detailSymbol.textContent = "-";
+  elements.detailName.textContent = message;
+  elements.detailClosePrice.textContent = "-";
+  elements.detailChange.textContent = "-";
+  elements.detailProfileBadges.innerHTML = "";
+  elements.detailHorizonScores.innerHTML = "";
+  elements.detailMetrics.innerHTML = "";
+  elements.indicatorSnapshot.innerHTML = "";
+  elements.windowTable.innerHTML = "";
+  elements.detailBullishReasons.innerHTML = "";
+  elements.detailRiskReasons.innerHTML = "";
+  elements.priceChart.innerHTML = "<p>No chart data.</p>";
+  elements.indicatorChart.innerHTML = "<p>No chart data.</p>";
+  setDetailState(message);
+}
+
+function renderDetailLoading(symbol) {
+  elements.detailTitle.textContent = `Loading ${symbol}`;
+  setDetailState("Fetching quote, indicators, and chart data...");
 }
 
 async function loadSectors() {
@@ -292,25 +412,36 @@ async function loadAnalysis() {
 }
 
 async function loadStockDetail(symbol) {
-  const detail = await fetchJson(`/api/stock/${symbol}`);
-  renderDetail(detail);
+  renderDetailLoading(symbol);
+  try {
+    const detail = await fetchJson(`/api/stock/${symbol}`);
+    renderDetail(detail);
+  } catch (error) {
+    renderDetailError(error.message);
+  }
 }
 
-elements.refreshButton.addEventListener("click", loadAnalysis);
+elements.refreshButton.addEventListener("click", () => {
+  loadAnalysis();
+  if (elements.stockSymbolInput.value.trim()) {
+    loadStockDetail(elements.stockSymbolInput.value.trim());
+  }
+});
 
 elements.stockSearchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const symbol = elements.stockSymbolInput.value.trim();
   if (!symbol) {
+    renderDetailError("Please enter a 4-digit stock symbol.");
     return;
   }
-  elements.detailTitle.textContent = `Loading ${symbol}`;
   await loadStockDetail(symbol);
 });
 
 async function bootstrap() {
   await loadSectors();
   await loadAnalysis();
+  elements.stockSymbolInput.value = "2330";
   await loadStockDetail("2330");
 }
 

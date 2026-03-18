@@ -11,6 +11,38 @@ const SECTORS = [
   { id: "materials", label: "Materials", color: "#8b6b3c", description: "Steel, petrochemicals, chemicals, and base materials.", sourceType: "industry" }
 ];
 
+const INDUSTRY_SECTOR_RULES = {
+  semiconductor: ["半導體業", "半導體"],
+  electronics: [
+    "電子零組件業",
+    "電腦及週邊設備業",
+    "光電業",
+    "通信網路業",
+    "電子通路業",
+    "資訊服務業",
+    "其他電子業"
+  ],
+  industrial: [
+    "電機機械",
+    "電機機械業",
+    "汽車工業",
+    "汽車工業業"
+  ],
+  medical: ["生技醫療業", "生技醫療"],
+  finance: ["金融保險業", "金融保險", "銀行業", "保險業", "證券業"],
+  energy: ["油電燃氣業", "油電燃氣"],
+  materials: [
+    "塑膠工業",
+    "塑膠",
+    "化學工業",
+    "化學生技醫療",
+    "橡膠工業",
+    "鋼鐵工業",
+    "玻璃陶瓷",
+    "電器電纜"
+  ]
+};
+
 const STOCKS = {
   "1301": { symbol: "1301", name: "Formosa Plastics", market: "TWSE", industry: "Plastics", active: true },
   "1303": { symbol: "1303", name: "Nan Ya Plastics", market: "TWSE", industry: "Plastics", active: true },
@@ -129,6 +161,7 @@ function getStockSectors(symbol) {
 module.exports = {
   SECTORS,
   STOCKS,
+  INDUSTRY_SECTOR_RULES,
   SECTOR_MEMBERSHIPS,
   getSectorSymbols,
   getStock,

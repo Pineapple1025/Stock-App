@@ -1,4 +1,3 @@
-const { getStock } = require("../data/sectors");
 const fugleClient = require("./fugleClient");
 
 function lastValue(rows, key) {
@@ -275,11 +274,11 @@ function analyzeByHorizon(metrics, horizon) {
   return analyzeLong(metrics);
 }
 
-async function analyzeSymbol(symbol, horizon) {
+async function analyzeSymbol(symbol, horizon, options = {}) {
   const metrics = await buildMetrics(symbol);
   return {
     symbol,
-    name: getStock(symbol)?.name || symbol,
+    name: options.name || symbol,
     metrics,
     analysis: analyzeByHorizon(metrics, horizon)
   };

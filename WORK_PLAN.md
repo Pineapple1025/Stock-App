@@ -30,7 +30,8 @@
 | Sector data structure | `DONE` | Sector, stock, and mapping structure added |
 | Single stock detail API | `DONE` | `/api/stock/:symbol` added |
 | Multi-window MACD/KDJ/volume | `DONE` | Window snapshots added |
-| Full stock universe import | `TODO` | Still using manually curated lists |
+| Stock detail charts | `DONE` | Price/volume and indicator SVG charts added |
+| Full stock universe import | `IN PROGRESS` | Official-data-backed universe loader added |
 | Real financial data enrichment | `TODO` | Revenue, EPS, ROE still partly fallback |
 | Model training pipeline | `TODO` | Not started |
 | Deployment | `TODO` | Not started |
@@ -62,9 +63,9 @@
 - [x] Create stock master data
 - [x] Create sector-to-stock mapping structure
 - [x] Support multi-sector membership for a stock
-- [ ] Add source metadata for each stock entry
+- [x] Add source metadata for each stock entry
 - [ ] Add ranking priority / popularity field
-- [ ] Add import-ready CSV or JSON format
+- [x] Add import-ready CSV or JSON format
 - [ ] Add full TWSE / TPEX universe import process
 
 ### Output
@@ -115,9 +116,9 @@
 - [x] Show latest MACD / KDJ snapshot
 - [x] Show 1D / 3D / 5D / 1M / 3M / 6M / 1Y windows
 - [x] Allow clicking stock card to load detail
-- [ ] Add chart area for candles / MACD / KDJ / volume
-- [ ] Add loading states for detail panel
-- [ ] Add empty / invalid symbol states
+- [x] Add chart area for candles / MACD / KDJ / volume
+- [x] Add loading states for detail panel
+- [x] Add empty / invalid symbol states
 - [ ] Add mobile polish pass
 
 ### Output

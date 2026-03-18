@@ -18,10 +18,18 @@ app.get("/api/health", (_request, response) => {
   });
 });
 
-app.get("/api/sectors", (_request, response) => {
-  response.json({
-    sectors: getSectors()
-  });
+app.get("/api/sectors", async (_request, response) => {
+  try {
+    response.json({
+      sectors: await getSectors()
+    });
+  } catch (error) {
+    response.status(error.status || 500).json({
+      error: "SECTOR_LIST_FAILED",
+      message: error.message,
+      detail: error.detail || null
+    });
+  }
 });
 
 app.get("/api/analysis", async (request, response) => {
