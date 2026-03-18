@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Taiwan Stock Trend Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="bg-orb orb-left"></div>
+  <div class="bg-orb orb-right"></div>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Taiwan Equity Signals</p>
+        <h1>Taiwan multi-horizon stock analysis</h1>
+      </div>
+      <div class="topbar-meta">
+        <span class="badge" id="dataSourceBadge">Checking data source</span>
+        <button class="ghost-button" id="refreshButton" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <section class="hero-card">
+      <div class="hero-copy">
+        <p class="hero-kicker">Fugle API + analysis architecture</p>
+        <h2>Select a sector, switch horizon, then inspect the strongest Taiwan stocks.</h2>
+        <p>The layout stays clean and professional, while the detail panel exposes richer score, indicator, and risk context.</p>
+        <form id="stockSearchForm" class="search-bar">
+          <input id="stockSymbolInput" type="text" inputmode="numeric" placeholder="Enter symbol, for example 2330">
+          <button type="submit">Search</button>
+        </form>
+      </div>
+      <div class="hero-grid">
+        <article class="hero-metric">
+          <span>Active sector</span>
+          <strong id="activeSectorLabel">Loading</strong>
+        </article>
+        <article class="hero-metric">
+          <span>Horizon</span>
+          <strong id="activeHorizonLabel">Short</strong>
+        </article>
+        <article class="hero-metric">
+          <span>Bullish picks</span>
+          <strong id="bullishCount">0 stocks</strong>
+        </article>
+        <article class="hero-metric">
+          <span>Top pick</span>
+          <strong id="topStockLabel">Loading</strong>
+        </article>
+      </div>
+    </section>
+
+    <main class="layout">
+      <aside class="sidebar-card">
+        <section>
+          <p class="panel-label">Sectors</p>
+          <div id="sectorTabs" class="stack-tabs"></div>
+        </section>
+
+        <section>
+          <p class="panel-label">Horizons</p>
+          <div id="horizonTabs" class="inline-tabs"></div>
+        </section>
+
+        <section class="side-note">
+          <p class="panel-label">Model roadmap</p>
+          <div id="algorithmNotes" class="algorithm-notes"></div>
+        </section>
+      </aside>
+
+      <section class="content-card">
+        <div class="section-head">
+          <div>
+            <p class="panel-label">Ranked results</p>
+            <h2 id="resultTitle">Sector view</h2>
+          </div>
+          <p class="muted" id="generatedAtLabel">Loading</p>
+        </div>
+        <div id="stockList" class="stock-list"></div>
+      </section>
+    </main>
+
+    <section class="detail-card">
+      <div class="section-head">
+        <div>
+          <p class="panel-label">Stock detail</p>
+          <h2 id="detailTitle">Enter a symbol to inspect one stock</h2>
+        </div>
+        <p class="muted" id="detailDateLabel">No symbol loaded</p>
+      </div>
+
+      <div class="detail-grid">
+        <article class="detail-summary">
+          <div class="detail-price-row">
+            <div>
+              <p class="stock-code" id="detailSymbol">-</p>
+              <h3 class="stock-name" id="detailName">Waiting for symbol</h3>
+            </div>
+            <div class="stock-score">
+              <strong class="score-value" id="detailClosePrice">-</strong>
+              <p class="muted" id="detailChange">-</p>
+            </div>
+          </div>
+          <div id="detailProfileBadges" class="detail-badges"></div>
+          <div id="detailHorizonScores" class="horizon-score-grid"></div>
+          <div id="detailMetrics" class="detail-metrics"></div>
+        </article>
+
+        <article class="detail-indicators">
+          <h3>Indicator snapshot</h3>
+          <div id="indicatorSnapshot" class="indicator-snapshot"></div>
+          <div id="windowTable" class="window-table"></div>
+        </article>
+      </div>
+
+      <div class="detail-grid detail-grid-bottom">
+        <article class="detail-summary">
+          <h3>Current-horizon bullish reasons</h3>
+          <ul id="detailBullishReasons" class="reason-list"></ul>
+        </article>
+        <article class="detail-summary">
+          <h3>Current-horizon risk notes</h3>
+          <ul id="detailRiskReasons" class="reason-list"></ul>
+        </article>
+      </div>
+    </section>
+  </div>
+
+  <template id="stockCardTemplate">
+    <article class="stock-card">
+      <div class="stock-card-head">
+        <div>
+          <p class="stock-code"></p>
+          <h3 class="stock-name"></h3>
+        </div>
+        <div class="stock-score">
+          <strong class="score-value"></strong>
+          <p class="star-rating"></p>
+        </div>
+      </div>
+
+      <div class="card-meta">
+        <span class="signal-pill"></span>
+        <span class="confidence-pill"></span>
+      </div>
+
+      <div class="content-columns">
+        <div>
+          <p class="block-title">Bullish reasons</p>
+          <ul class="reason-list bullish-reasons"></ul>
+        </div>
+        <div>
+          <p class="block-title">Risk notes</p>
+          <ul class="reason-list risk-reasons"></ul>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <script src="./app.js"></script>
+</body>
+</html>
