@@ -799,13 +799,22 @@ function renderDetail(detail) {
   appendListItems(elements.detailBullishReasons, detail.horizonScores[state.horizon].bullishReasons, "目前沒有明確看漲因素。");
   appendListItems(elements.detailRiskReasons, detail.horizonScores[state.horizon].riskReasons, "目前沒有明確風險提醒。");
 
-  elements.detailMetrics.innerHTML = [
-    { label: "開盤", value: detail.quote.openPrice },
-    { label: "最高", value: detail.quote.highPrice },
-    { label: "最低", value: detail.quote.lowPrice },
-    { label: "昨收", value: detail.quote.previousClose },
-    { label: "成交量", value: detail.quote.tradeVolume, digits: 0 }
-  ].map((item) => `<div class="metric-chip"><span>${item.label}</span><strong>${formatNumber(item.value, item.digits ?? 2)}</strong></div>`).join("");
+  elements.detailMetrics.innerHTML = `
+    <section class="metrics-panel">
+      <div class="metrics-panel-head">
+        <span class="panel-label">????</span>
+      </div>
+      <div class="metrics-panel-grid">
+        ${[
+          { label: "??", value: detail.quote.openPrice },
+          { label: "??", value: detail.quote.highPrice },
+          { label: "??", value: detail.quote.lowPrice },
+          { label: "??", value: detail.quote.previousClose },
+          { label: "???", value: detail.quote.tradeVolume, digits: 0 }
+        ].map((item) => `<div class="metric-chip"><span>${item.label}</span><strong>${formatNumber(item.value, item.digits ?? 2)}</strong></div>`).join("")}
+      </div>
+    </section>
+  `;
 
   bindFavoriteButton(elements.detailFavoriteButton, { symbol: detail.symbol, name: detail.quote.name || detail.symbol });
   renderDetailCharts(detail);

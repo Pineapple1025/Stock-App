@@ -761,6 +761,23 @@ h3 {
   margin-top: 16px;
 }
 
+.metrics-panel {
+  border-radius: 20px;
+  background: rgba(248, 244, 239, 0.68);
+  border: 1px solid rgba(31, 31, 31, 0.06);
+  padding: 14px;
+}
+
+.metrics-panel-head {
+  margin-bottom: 12px;
+}
+
+.metrics-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .detail-indicator-head {
   display: flex;
   justify-content: space-between;
@@ -1137,7 +1154,8 @@ h3 {
   .content-columns,
   .horizon-score-grid,
   .chart-insights,
-  .compact-indicator-panel {
+  .compact-indicator-panel,
+  .metrics-panel-grid {
     grid-template-columns: 1fr;
   }
 
