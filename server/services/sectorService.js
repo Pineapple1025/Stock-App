@@ -110,13 +110,18 @@ async function getStockDetail(symbolInput) {
 
   const stockMeta = await getStock(symbol);
   const metrics = await buildMetrics(symbol);
-  const [quote, candles, macd, kdj, universe] = await Promise.all([
-    fugleClient.getQuote(symbol),
-    fugleClient.getHistoricalCandles(symbol, { daysBack: 370 }),
-    fugleClient.getMACD(symbol, { daysBack: 200 }),
-    fugleClient.getKDJ(symbol, { daysBack: 200 }),
+  const [quoteResult, candlesResult, macdResult, kdjResult, universe] = await Promise.all([
+    fugleClient.getQuote(symbol).then((value) => ({ ok: true, value })).catch(() => ({ ok: false, value: null })),
+    fugleClient.getHistoricalCandles(symbol, { daysBack: 370 }).then((value) => ({ ok: true, value })).catch(() => ({ ok: false, value: null })),
+    fugleClient.getMACD(symbol, { daysBack: 200 }).then((value) => ({ ok: true, value })).catch(() => ({ ok: false, value: null })),
+    fugleClient.getKDJ(symbol, { daysBack: 200 }).then((value) => ({ ok: true, value })).catch(() => ({ ok: false, value: null })),
     getUniverse()
   ]);
+
+  const quote = quoteResult.value;
+  const candles = candlesResult.value;
+  const macd = macdResult.value;
+  const kdj = kdjResult.value;
 
   const candleRows = candles?.data || [];
   const macdRows = macd?.data || [];
@@ -150,15 +155,15 @@ async function getStockDetail(symbolInput) {
     },
     quote: {
       name: stockMeta?.name || quote?.name || symbol,
-      closePrice: quote?.closePrice || latestCandle?.close || null,
-      openPrice: quote?.openPrice || latestCandle?.open || null,
-      highPrice: quote?.highPrice || latestCandle?.high || null,
-      lowPrice: quote?.lowPrice || latestCandle?.low || null,
-      previousClose: quote?.previousClose || null,
-      change: quote?.change || null,
-      changePercent: quote?.changePercent || null,
-      tradeVolume: quote?.tradeVolume || latestCandle?.volume || null,
-      tradeDate: quote?.date || latestCandle?.date || null
+      closePrice: quote?.closePrice ?? latestCandle?.close ?? null,
+      openPrice: quote?.openPrice ?? latestCandle?.open ?? null,
+      highPrice: quote?.highPrice ?? latestCandle?.high ?? null,
+      lowPrice: quote?.lowPrice ?? latestCandle?.low ?? null,
+      previousClose: quote?.previousClose ?? null,
+      change: quote?.change ?? null,
+      changePercent: quote?.changePercent ?? null,
+      tradeVolume: quote?.total?.tradeVolume ?? latestCandle?.volume ?? null,
+      tradeDate: quote?.date ?? latestCandle?.date ?? null
     },
     latestIndicators: {
       macd: latestMacd ? {

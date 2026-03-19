@@ -1,250 +1,251 @@
-# Stock App Progress Tracker
+# Stock App 專案進度追蹤
 
-## Project Summary
+## 專案摘要
 
-- Project: Taiwan stock analysis website
-- Market scope: Taiwan stocks only
-- Data source: Fugle API
-- Main views:
-  - Sector-based ranking view
-  - Single-stock detail view
-- Model roadmap:
-  - Short term: TCN-Transformer / MASTER
-  - Mid term: XGBoost / LightGBM
-  - Long term: Bayesian Neural Networks
+- 專案名稱：台股分析網站
+- 市場範圍：台股
+- 資料來源：Fugle API
+- 主要功能：
+  - 產業分類分析頁
+  - 單一股票詳情頁
+- 模型規劃：
+  - 短期：TCN-Transformer / MASTER
+  - 中期：XGBoost / LightGBM
+  - 長期：Bayesian Neural Networks
 
-## Status Legend
+## 狀態說明
 
-- `TODO`: not started
-- `IN PROGRESS`: currently being built
-- `BLOCKED`: waiting for data, tool, or decision
-- `DONE`: completed
+- `TODO`：尚未開始
+- `進行中`：正在處理
+- `阻塞中`：等待資料、工具或決策
+- `已完成`：已完成
 
-## Current Snapshot
+## 目前總覽
 
-| Area | Status | Notes |
+| 項目 | 狀態 | 說明 |
 | --- | --- | --- |
-| Frontend structure | `DONE` | Main sector page and stock detail section exist |
-| Backend API skeleton | `DONE` | Express routes and Fugle client are in place |
-| Fugle API key setup | `DONE` | `.env` created |
-| Sector data structure | `DONE` | Sector, stock, and mapping structure added |
-| Single stock detail API | `DONE` | `/api/stock/:symbol` added |
-| Multi-window MACD/KDJ/volume | `DONE` | Window snapshots added |
-| Stock detail charts | `DONE` | Price/volume and indicator SVG charts added |
-| Full stock universe import | `IN PROGRESS` | Official-data-backed universe loader added |
-| Real financial data enrichment | `TODO` | Revenue, EPS, ROE still partly fallback |
-| Model training pipeline | `TODO` | Not started |
-| Deployment | `TODO` | Not started |
+| 前端頁面骨架 | `已完成` | 已有分類頁與單股詳情區塊 |
+| 後端 API 骨架 | `已完成` | Express 路由與 Fugle client 已建立 |
+| Fugle API Key 設定 | `已完成` | `.env` 已建立 |
+| 分類 / 股票 / 對應資料結構 | `已完成` | 已拆成可維護結構 |
+| 單股詳情 API | `已完成` | `/api/stock/:symbol` 已可用 |
+| 多區間 MACD / KDJ / 成交量 | `已完成` | 已支援 1D / 3D / 5D / 1M / 3M / 6M / 1Y |
+| 單股詳情圖表 | `已完成` | 已有價格 / 成交量圖與指標圖 |
+| 完整股票池匯入 | `進行中` | 已加入官方資料驅動的 universe service |
+| 基本面資料補強 | `TODO` | 營收、EPS、ROE 仍有 fallback |
+| 模型訓練流程 | `TODO` | 尚未開始 |
+| 部署與正式驗證 | `TODO` | 尚未完成 |
 
-## Phase 1: Product and Data Scope
+## Phase 1：需求與目標確認
 
-### Goals
+### 任務
 
-- [x] Confirm Taiwan stock market only
-- [x] Confirm major sector list
-- [x] Confirm Fugle API key available
-- [x] Confirm short / mid / long model direction
-- [ ] Finalize exact definition of bullish target by horizon
-- [ ] Finalize whether ranking is absolute return or benchmark-relative return
-- [ ] Finalize whether stop-loss / risk grading is required
+- [x] 確認只做台股
+- [x] 確認主要產業分類
+- [x] 確認 Fugle API Key 可用
+- [x] 確認短 / 中 / 長期模型方向
+- [ ] 定義短期、中期、長期「看漲」標準
+- [ ] 確認分數依據是絕對報酬還是相對大盤
+- [ ] 確認是否要加入停損 / 風險分級
 
-### Output
+### 輸出
 
-- Status: `IN PROGRESS`
-- Owner: project
-- Blockers:
-  - Bullish label definition still needs final rule
+- 狀態：`進行中`
+- 目前阻塞：
+  - 看漲標籤與評分標準還沒完全定義
 
-## Phase 2: Data Architecture
+## Phase 2：資料架構
 
-### Goals
+### 任務
 
-- [x] Create sector master data
-- [x] Create stock master data
-- [x] Create sector-to-stock mapping structure
-- [x] Support multi-sector membership for a stock
-- [x] Add source metadata for each stock entry
-- [ ] Add ranking priority / popularity field
-- [x] Add import-ready CSV or JSON format
-- [ ] Add full TWSE / TPEX universe import process
+- [x] 建立分類主表
+- [x] 建立股票主表
+- [x] 建立分類對應表
+- [x] 支援一檔股票對應多個分類
+- [x] 加入資料來源欄位
+- [ ] 加入熱門度 / 排序欄位
+- [x] 建立可延伸的匯入式資料結構
+- [ ] 完成 TWSE / TPEX 全量股票池正規化
 
-### Output
+### 輸出
 
-- Status: `IN PROGRESS`
-- Main files:
+- 狀態：`進行中`
+- 主要檔案：
   - `server/data/sectors.js`
-- Next step:
-  - Replace manually maintained lists with bulk-import structure
+  - `server/services/stockUniverseService.js`
 
-## Phase 3: Backend API
+## Phase 3：後端 API
 
-### Goals
+### 任務
 
-- [x] Create health check endpoint
-- [x] Create sector list endpoint
-- [x] Create sector analysis endpoint
-- [x] Create single stock detail endpoint
-- [x] Add Fugle quote fetch
-- [x] Add historical candles fetch
-- [x] Add SMA fetch
-- [x] Add RSI fetch
-- [x] Add MACD fetch
-- [x] Add KDJ fetch
-- [ ] Add stronger API error normalization
-- [ ] Add caching layer
-- [ ] Add rate-limit protection
-- [ ] Add bulk background refresh flow
+- [x] 建立健康檢查 API
+- [x] 建立分類列表 API
+- [x] 建立分類分析 API
+- [x] 建立單股詳情 API
+- [x] 串接 Fugle 即時報價
+- [x] 串接歷史 K 線
+- [x] 串接 SMA
+- [x] 串接 RSI
+- [x] 串接 MACD
+- [x] 串接 KDJ
+- [ ] 補強 API 錯誤格式統一
+- [ ] 加入快取策略
+- [ ] 加入 API rate limit 保護
+- [ ] 建立背景更新流程
 
-### Output
+### 輸出
 
-- Status: `IN PROGRESS`
-- Main files:
+- 狀態：`進行中`
+- 主要檔案：
   - `server/index.js`
   - `server/services/fugleClient.js`
   - `server/services/sectorService.js`
   - `server/services/analysisEngine.js`
+  - `server/services/stockUniverseService.js`
 
-## Phase 4: Frontend Experience
+## Phase 4：前端體驗
 
-### Goals
+### 任務
 
-- [x] Build sector list UI
-- [x] Build short / mid / long horizon switch
-- [x] Show ranked stock cards
-- [x] Add single stock search
-- [x] Add stock detail summary
-- [x] Show latest MACD / KDJ snapshot
-- [x] Show 1D / 3D / 5D / 1M / 3M / 6M / 1Y windows
-- [x] Allow clicking stock card to load detail
-- [x] Add chart area for candles / MACD / KDJ / volume
-- [x] Add loading states for detail panel
-- [x] Add empty / invalid symbol states
-- [ ] Add mobile polish pass
+- [x] 建立分類切換 UI
+- [x] 建立短 / 中 / 長期切換
+- [x] 顯示排名股票卡片
+- [x] 建立單股搜尋
+- [x] 建立單股詳情摘要
+- [x] 顯示最新 MACD / KDJ
+- [x] 顯示 1D / 3D / 5D / 1M / 3M / 6M / 1Y 區間資料
+- [x] 支援點卡片直接切換到單股詳情
+- [x] 加入圖表區塊
+- [x] 加入詳情頁 loading 狀態
+- [x] 加入無效代碼 / 錯誤提示
+- [ ] 手機版細節優化
+- [ ] 視覺與中文文案最後整理
 
-### Output
+### 輸出
 
-- Status: `IN PROGRESS`
-- Main files:
+- 狀態：`進行中`
+- 主要檔案：
   - `public/index.html`
   - `public/styles.css`
   - `public/app.js`
 
-## Phase 5: Scoring and Explanation
+## Phase 5：評分與解釋
 
-### Goals
+### 任務
 
-- [x] Create short-term scoring logic
-- [x] Create mid-term scoring logic
-- [x] Create long-term scoring logic
-- [x] Convert scores to 1-5 stars
-- [x] Add bullish reasons
-- [x] Add risk notes
-- [x] Add confidence field
-- [ ] Make weights configurable
-- [ ] Add benchmark-relative ranking mode
-- [ ] Add explanation layer tied to future ML outputs
+- [x] 建立短期評分邏輯
+- [x] 建立中期評分邏輯
+- [x] 建立長期評分邏輯
+- [x] 將分數轉為 1 到 5 星
+- [x] 顯示看漲參考因素
+- [x] 顯示風險提醒
+- [x] 顯示信心分數
+- [ ] 讓權重可調整
+- [ ] 加入相對大盤排名模式
+- [ ] 為未來模型輸出保留解釋層
 
-### Output
+### 輸出
 
-- Status: `IN PROGRESS`
+- 狀態：`進行中`
 
-## Phase 6: Model Pipeline
+## Phase 6：模型流程
 
-### Short Term
+### 短期
 
-- [ ] Define training label for 5 / 10 / 20 trading days
-- [ ] Build TCN-Transformer training dataset
-- [ ] Evaluate whether MASTER is better for input design
-- [ ] Create training script
-- [ ] Create validation report
+- [ ] 定義 5 / 10 / 20 日標籤
+- [ ] 建立 TCN-Transformer 訓練資料集
+- [ ] 評估是否切到 MASTER 結構
+- [ ] 建立訓練腳本
+- [ ] 建立驗證報告
 
-### Mid Term
+### 中期
 
-- [ ] Define training label for 1 to 3 months
-- [ ] Build tabular feature dataset
-- [ ] Train XGBoost baseline
-- [ ] Train LightGBM comparison model
-- [ ] Generate feature importance report
+- [ ] 定義 1 到 3 個月標籤
+- [ ] 建立表格型特徵資料集
+- [ ] 訓練 XGBoost baseline
+- [ ] 訓練 LightGBM 對照模型
+- [ ] 產出特徵重要度報告
 
-### Long Term
+### 長期
 
-- [ ] Define training label for 3 to 12 months
-- [ ] Build long-horizon fundamental feature set
-- [ ] Train Bayesian Neural Network baseline
-- [ ] Add uncertainty output
-- [ ] Create validation report
+- [ ] 定義 3 到 12 個月標籤
+- [ ] 建立長期基本面特徵集
+- [ ] 訓練 Bayesian Neural Network baseline
+- [ ] 加入不確定性輸出
+- [ ] 產出驗證報告
 
-### Output
+### 輸出
 
-- Status: `TODO`
+- 狀態：`TODO`
 
-## Phase 7: Financial and Fundamental Data Enrichment
+## Phase 7：基本面與財務資料補強
 
-### Goals
+### 任務
 
-- [ ] Confirm Fugle coverage for revenue / EPS / ROE / valuation fields
-- [ ] Add additional data source if Fugle alone is not enough
-- [ ] Replace fallback values for revenue / EPS / ROE
-- [ ] Add institutional flow data if available
-- [ ] Add valuation metrics pipeline
+- [ ] 確認 Fugle 是否足夠提供營收 / EPS / ROE / 估值欄位
+- [ ] 若 Fugle 不足，補其他資料來源
+- [ ] 用真實資料取代 fallback 的營收 / EPS / ROE
+- [ ] 加入法人籌碼資料
+- [ ] 加入估值指標
 
-### Output
+### 輸出
 
-- Status: `TODO`
-- Risk:
-  - This phase depends on actual API plan and available fields
+- 狀態：`TODO`
+- 風險：
+  - 這一階段取決於 API 方案與實際欄位可用性
 
-## Phase 8: Deployment and Ops
+## Phase 8：部署與維運
 
-### Goals
+### 任務
 
-- [ ] Install Node.js on target environment
-- [ ] Run `npm install`
-- [ ] Run local server verification
-- [ ] Add production env template
-- [ ] Prepare GitHub repo sync
-- [ ] Prepare deployment target
-- [ ] Add logging and monitoring basics
+- [ ] 安裝 Node.js 到目標環境
+- [ ] 執行 `npm install`
+- [ ] 本機完整啟動驗證
+- [ ] 建立 production env 範本
+- [x] 建立 GitHub repo 並同步
+- [ ] 準備部署環境
+- [ ] 加入基本 log / monitoring
 
-### Output
+### 輸出
 
-- Status: `BLOCKED`
-- Blockers:
-  - Current workspace does not have Node.js installed
-  - Git repository is not initialized in this folder yet
+- 狀態：`阻塞中`
+- 阻塞原因：
+  - 目前開發過程中未完整做 runtime 驗證
 
-## Immediate Next Tasks
+## 目前最優先待辦
 
 ### Priority 1
 
-- [ ] Replace curated sector lists with import-ready full stock universe structure
-- [ ] Add chart-ready data blocks for stock detail page
-- [ ] Add invalid symbol and loading UI states
+- [ ] 完成 TWSE / TPEX 全量股票池正規化
+- [ ] 補齊詳情頁圖表與真實資料的整合驗證
+- [ ] 補上更多真實基本面欄位
 
 ### Priority 2
 
-- [ ] Verify actual Fugle field coverage for fundamentals
-- [ ] Add caching strategy for repeated API calls
-- [ ] Add popularity / ranking field to stock master data
+- [ ] 加入快取策略與 API 保護
+- [ ] 加入股票熱門度 / 排序邏輯
+- [ ] 讓詳情頁支援更完整的圖形分析
 
 ### Priority 3
 
-- [ ] Start model dataset design for short-term forecast
-- [ ] Start benchmark definition for ranking logic
+- [ ] 開始模型資料集設計
+- [ ] 定義 benchmark 與回測方式
 
-## Decisions Needed From User
+## 需要你確認的事項
 
-- [ ] Define bullish target rule for short / mid / long horizon
-- [ ] Decide whether ranking is absolute return or benchmark-relative
-- [ ] Decide whether to show only top 20 per concept sector or all mapped stocks
-- [ ] Decide whether to add charts in the next build step
+- [ ] 短 / 中 / 長期的看漲標準
+- [ ] 排名依據是絕對報酬還是相對大盤
+- [ ] 概念股顯示只保留前 20，還是全部映射股票
+- [ ] 下一步要不要優先補圖表或模型資料集
 
-## Notes
+## 備註
 
-- The current environment does not have Node.js, so runtime verification has not been completed here.
-- The current sector universe is structured for maintainability, but not yet a full imported TWSE / TPEX universe.
-- The single-stock detail page already supports:
-  - basic quote
-  - short / mid / long scores
-  - latest MACD / KDJ
-  - 1D / 3D / 5D / 1M / 3M / 6M / 1Y snapshots
+- 目前 repo 與 GitHub 已同步。
+- 單股詳情頁目前已支援：
+  - 基本報價
+  - 短 / 中 / 長期分數
+  - 最新 MACD / KDJ
+  - 1D / 3D / 5D / 1M / 3M / 6M / 1Y 區間快照
+  - 價格 / 成交量圖
+  - MACD / KDJ 圖
+- 目前股票 universe 已從純手動清單升級為「官方資料 + fallback」的方向，但尚未完成完整台股全量正規化。

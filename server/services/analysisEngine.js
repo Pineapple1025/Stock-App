@@ -121,7 +121,7 @@ function finalizeScore(score, bullishReasons, riskReasons, confidence) {
   return {
     score: finalScore,
     stars: buildStars(finalScore),
-    biasLabel: finalScore >= 80 ? "強勢看漲" : finalScore >= 60 ? "偏多" : finalScore >= 40 ? "中性偏多" : "保守觀察",
+    biasLabel: finalScore >= 80 ? "偏多看漲" : finalScore >= 60 ? "偏多" : finalScore >= 40 ? "中性觀察" : "保守看待",
     bullishReasons: bullishReasons.slice(0, 4),
     riskReasons: riskReasons.slice(0, 3),
     confidence: clamp(Math.round(confidence), 35, 95)
@@ -136,43 +136,43 @@ function analyzeShort(metrics) {
 
   if (metrics.ma5Gap > 0 && metrics.ma10Gap > 0 && metrics.ma20Gap > 0) {
     score += 20;
-    bullishReasons.push("股價站穩 MA5、MA10、MA20，短線趨勢完整。");
+    bullishReasons.push("股價站上 MA5、MA10、MA20，短線結構偏強。");
   } else {
-    riskReasons.push("短均線排列仍有缺口，追價前要看支撐是否穩定。");
+    riskReasons.push("短線均線尚未全面翻多，仍要留意回測壓力。");
   }
 
   if (metrics.rsi14 >= 52 && metrics.rsi14 <= 68) {
     score += 14;
     confidence += 8;
-    bullishReasons.push(`RSI14 約 ${metrics.rsi14.toFixed(1)}，動能落在健康偏多區。`);
+    bullishReasons.push(`RSI14 位於 ${metrics.rsi14.toFixed(1)}，屬於健康偏多區間。`);
   } else if (metrics.rsi14 > 68) {
     score += 7;
-    riskReasons.push(`RSI14 約 ${metrics.rsi14.toFixed(1)}，短線稍熱。`);
+    riskReasons.push(`RSI14 位於 ${metrics.rsi14.toFixed(1)}，短線可能過熱。`);
   } else {
-    riskReasons.push(`RSI14 約 ${metrics.rsi14.toFixed(1)}，動能還沒完全轉強。`);
+    riskReasons.push(`RSI14 位於 ${metrics.rsi14.toFixed(1)}，動能仍偏弱。`);
   }
 
   if (metrics.macdBullish) {
     score += 16;
     confidence += 7;
-    bullishReasons.push("MACD 維持多方訊號，短波段續強機率較高。");
+    bullishReasons.push("MACD 維持多方結構，動能有延續機會。");
   } else {
-    riskReasons.push("MACD 尚未翻多，短線慣性還需要確認。");
+    riskReasons.push("MACD 尚未轉強，短線反彈力道仍需確認。");
   }
 
   if (metrics.volumeRatio >= 1.15) {
     score += 16;
     confidence += 6;
-    bullishReasons.push(`量能約為近 5 日均量 ${metrics.volumeRatio.toFixed(2)} 倍，資金有跟上。`);
+    bullishReasons.push(`成交量約為近 5 日均量的 ${metrics.volumeRatio.toFixed(2)} 倍，量能有跟上。`);
   } else {
-    riskReasons.push("量能放大不明顯，攻擊力道可能受限。");
+    riskReasons.push("量能沒有明顯放大，短線續攻力道可能不足。");
   }
 
   if (metrics.breakout20) {
     score += 12;
-    bullishReasons.push("股價有機會突破近 20 日整理高點。");
+    bullishReasons.push("股價突破近 20 日相對高點，具備短線突破訊號。");
   } else {
-    riskReasons.push("尚未有效突破區間高點，容易反覆震盪。");
+    riskReasons.push("尚未突破近 20 日壓力區，容易在前高附近震盪。");
   }
 
   return finalizeScore(score, bullishReasons, riskReasons, confidence);
@@ -186,35 +186,35 @@ function analyzeMid(metrics) {
 
   if (metrics.ma20Gap > 0 && metrics.ma60Gap > 0) {
     score += 22;
-    bullishReasons.push("股價高於 MA20 與 MA60，中期波段方向偏上。");
+    bullishReasons.push("股價站上 MA20 與 MA60，中期趨勢維持向上。");
   } else {
-    riskReasons.push("中期均線優勢不足，波段續航力需要再觀察。");
+    riskReasons.push("中期均線尚未完全走多，波段趨勢仍需確認。");
   }
 
   if (metrics.volumeRatio >= 1.05) {
     score += 10;
     confidence += 6;
-    bullishReasons.push("量價結構穩定，中期資金動能不弱。");
+    bullishReasons.push("量價結構配合，中期趨勢有機會延續。");
   } else {
-    riskReasons.push("量價配合普通，中期推升空間可能受限。");
+    riskReasons.push("量能偏平，波段走勢可能缺乏推升力道。");
   }
 
   if (metrics.revenueYoY >= 15) {
     score += 18;
     confidence += 8;
-    bullishReasons.push(`營收年增約 ${metrics.revenueYoY.toFixed(1)}%，基本面有支撐。`);
+    bullishReasons.push(`營收年增約 ${metrics.revenueYoY.toFixed(1)}%，基本面支撐較強。`);
   } else if (metrics.revenueYoY >= 8) {
     score += 10;
-    bullishReasons.push(`營收年增約 ${metrics.revenueYoY.toFixed(1)}%，成長溫和。`);
+    bullishReasons.push(`營收年增約 ${metrics.revenueYoY.toFixed(1)}%，屬於穩健成長。`);
   } else {
-    riskReasons.push("營收成長動能普通，中期評分保守。");
+    riskReasons.push("營收成長動能有限，中期評價可能受到壓抑。");
   }
 
   if (metrics.foreignBuyDays >= 3) {
     score += 12;
-    bullishReasons.push(`法人近 ${metrics.foreignBuyDays} 日偏買超，籌碼面加分。`);
+    bullishReasons.push(`外資近 ${metrics.foreignBuyDays} 日偏買超，籌碼面有支撐。`);
   } else {
-    riskReasons.push("法人連續買超天數不多，籌碼優勢有限。");
+    riskReasons.push("外資連買天數不足，籌碼動能仍不夠明顯。");
   }
 
   return finalizeScore(score, bullishReasons, riskReasons, confidence);
@@ -228,37 +228,37 @@ function analyzeLong(metrics) {
 
   if (metrics.ma60Gap > 0 && metrics.ma120Gap > 0) {
     score += 22;
-    bullishReasons.push("價格高於中長期均線，長線趨勢維持向上。");
+    bullishReasons.push("股價站上中長期均線，長線趨勢仍偏多。");
   } else {
-    riskReasons.push("長線均線優勢不足，需提防趨勢反覆。");
+    riskReasons.push("長期均線支撐不足，仍需留意趨勢反覆。");
   }
 
   if (metrics.epsYoY >= 15) {
     score += 16;
     confidence += 8;
-    bullishReasons.push(`EPS 年增約 ${metrics.epsYoY.toFixed(1)}%，獲利成長清楚。`);
+    bullishReasons.push(`EPS 年增約 ${metrics.epsYoY.toFixed(1)}%，獲利成長表現佳。`);
   } else if (metrics.epsYoY >= 8) {
     score += 10;
-    bullishReasons.push(`EPS 年增約 ${metrics.epsYoY.toFixed(1)}%，獲利仍有延續。`);
+    bullishReasons.push(`EPS 年增約 ${metrics.epsYoY.toFixed(1)}%，獲利維持成長。`);
   } else {
-    riskReasons.push("EPS 成長力道偏弱，長線評價要保守。");
+    riskReasons.push("EPS 成長幅度有限，長期上修空間可能受限。");
   }
 
   if (metrics.roe >= 15) {
     score += 14;
-    bullishReasons.push(`ROE 約 ${metrics.roe.toFixed(1)}%，資本效率良好。`);
+    bullishReasons.push(`ROE 約 ${metrics.roe.toFixed(1)}%，資本效率表現優秀。`);
   } else if (metrics.roe >= 10) {
     score += 8;
-    bullishReasons.push(`ROE 約 ${metrics.roe.toFixed(1)}%，體質穩定。`);
+    bullishReasons.push(`ROE 約 ${metrics.roe.toFixed(1)}%，屬於穩健水準。`);
   } else {
-    riskReasons.push("ROE 偏低，長線競爭力需要更多驗證。");
+    riskReasons.push("ROE 偏低，長期投資吸引力仍需觀察。");
   }
 
   if ((metrics.valuationPercentile || 55) <= 65) {
     score += 10;
-    bullishReasons.push("估值未落在極端昂貴區，長期承接壓力較小。");
+    bullishReasons.push("估值位置仍在可接受區間，長期布局風險相對可控。");
   } else {
-    riskReasons.push("目前估值偏高，後續需靠成長消化。");
+    riskReasons.push("目前估值偏高，長期持有需注意回檔風險。");
   }
 
   return finalizeScore(score, bullishReasons, riskReasons, confidence);

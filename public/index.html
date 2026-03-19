@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Taiwan Stock Trend Dashboard</title>
+  <title>台股趨勢分析平台</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
@@ -17,40 +17,40 @@
     <header class="topbar">
       <div>
         <p class="eyebrow">Taiwan Equity Signals</p>
-        <h1>Taiwan multi-horizon stock analysis</h1>
+        <h1>台股趨勢分析平台</h1>
       </div>
       <div class="topbar-meta">
-        <span class="badge" id="dataSourceBadge">Checking data source</span>
-        <button class="ghost-button" id="refreshButton" type="button">Refresh</button>
+        <span class="badge" id="dataSourceBadge">資料來源載入中</span>
+        <button class="ghost-button" id="refreshButton" type="button">重新整理</button>
       </div>
     </header>
 
     <section class="hero-card">
       <div class="hero-copy">
-        <p class="hero-kicker">Fugle API + analysis architecture</p>
-        <h2>Select a sector, switch horizon, then inspect the strongest Taiwan stocks.</h2>
-        <p>The layout stays clean and professional, while the detail panel exposes richer score, indicator, and risk context.</p>
+        <p class="hero-kicker">Fugle API + 多週期分析</p>
+        <h2>先看產業，再切換短期、中期、長期，快速找出偏多股票與單股技術概況。</h2>
+        <p>你可以先從產業分類查看熱門標的，也可以直接輸入股票代碼，查看這檔股票的價格、MACD、KDJ、成交量與各期間摘要。</p>
         <form id="stockSearchForm" class="search-bar">
-          <input id="stockSymbolInput" type="text" inputmode="numeric" placeholder="Enter symbol, for example 2330">
-          <button type="submit">Search</button>
+          <input id="stockSymbolInput" type="text" inputmode="numeric" placeholder="輸入 4 位股票代碼，例如 2330">
+          <button type="submit">查詢股票</button>
         </form>
       </div>
       <div class="hero-grid">
         <article class="hero-metric">
-          <span>Active sector</span>
-          <strong id="activeSectorLabel">Loading</strong>
+          <span>目前產業</span>
+          <strong id="activeSectorLabel">載入中</strong>
         </article>
         <article class="hero-metric">
-          <span>Horizon</span>
-          <strong id="activeHorizonLabel">Short</strong>
+          <span>分析週期</span>
+          <strong id="activeHorizonLabel">短期</strong>
         </article>
         <article class="hero-metric">
-          <span>Bullish picks</span>
-          <strong id="bullishCount">0 stocks</strong>
+          <span>偏多股票數</span>
+          <strong id="bullishCount">0 檔</strong>
         </article>
         <article class="hero-metric">
-          <span>Top pick</span>
-          <strong id="topStockLabel">Loading</strong>
+          <span>本期第一名</span>
+          <strong id="topStockLabel">載入中</strong>
         </article>
       </div>
     </section>
@@ -58,17 +58,17 @@
     <main class="layout">
       <aside class="sidebar-card">
         <section>
-          <p class="panel-label">Sectors</p>
+          <p class="panel-label">產業分類</p>
           <div id="sectorTabs" class="stack-tabs"></div>
         </section>
 
         <section>
-          <p class="panel-label">Horizons</p>
+          <p class="panel-label">分析週期</p>
           <div id="horizonTabs" class="inline-tabs"></div>
         </section>
 
         <section class="side-note">
-          <p class="panel-label">Model roadmap</p>
+          <p class="panel-label">模型規劃</p>
           <div id="algorithmNotes" class="algorithm-notes"></div>
         </section>
       </aside>
@@ -76,10 +76,10 @@
       <section class="content-card">
         <div class="section-head">
           <div>
-            <p class="panel-label">Ranked results</p>
-            <h2 id="resultTitle">Sector view</h2>
+            <p class="panel-label">產業排行</p>
+            <h2 id="resultTitle">分類分析結果</h2>
           </div>
-          <p class="muted" id="generatedAtLabel">Loading</p>
+          <p class="muted" id="generatedAtLabel">載入中</p>
         </div>
         <div id="stockList" class="stock-list"></div>
       </section>
@@ -88,10 +88,10 @@
     <section class="detail-card">
       <div class="section-head">
         <div>
-          <p class="panel-label">Stock detail</p>
-          <h2 id="detailTitle">Enter a symbol to inspect one stock</h2>
+          <p class="panel-label">單股詳情</p>
+          <h2 id="detailTitle">輸入股票代碼後查看單股分析</h2>
         </div>
-        <p class="muted" id="detailDateLabel">No symbol loaded</p>
+        <p class="muted" id="detailDateLabel">等待查詢</p>
       </div>
 
       <div class="detail-grid">
@@ -99,7 +99,7 @@
           <div class="detail-price-row">
             <div>
               <p class="stock-code" id="detailSymbol">-</p>
-              <h3 class="stock-name" id="detailName">Waiting for symbol</h3>
+              <h3 class="stock-name" id="detailName">請輸入股票代碼</h3>
             </div>
             <div class="stock-score">
               <strong class="score-value" id="detailClosePrice">-</strong>
@@ -112,7 +112,7 @@
         </article>
 
         <article class="detail-indicators">
-          <h3>Indicator snapshot</h3>
+          <h3>技術指標摘要</h3>
           <div id="indicatorSnapshot" class="indicator-snapshot"></div>
           <div id="windowTable" class="window-table"></div>
         </article>
@@ -120,22 +120,22 @@
 
       <div class="detail-grid detail-grid-bottom">
         <article class="detail-summary">
-          <h3>Current-horizon bullish reasons</h3>
+          <h3>目前週期看漲因素</h3>
           <ul id="detailBullishReasons" class="reason-list"></ul>
         </article>
         <article class="detail-summary">
-          <h3>Current-horizon risk notes</h3>
+          <h3>目前週期風險提醒</h3>
           <ul id="detailRiskReasons" class="reason-list"></ul>
         </article>
       </div>
 
       <div class="detail-grid detail-grid-bottom">
         <article class="detail-summary">
-          <h3>Price and volume</h3>
+          <h3>近 60 筆價格與成交量</h3>
           <div id="priceChart" class="chart-box"></div>
         </article>
         <article class="detail-summary">
-          <h3>MACD and KDJ</h3>
+          <h3>MACD 與 KDJ</h3>
           <div id="indicatorChart" class="chart-box"></div>
         </article>
       </div>
@@ -164,11 +164,11 @@
 
       <div class="content-columns">
         <div>
-          <p class="block-title">Bullish reasons</p>
+          <p class="block-title">看漲因素</p>
           <ul class="reason-list bullish-reasons"></ul>
         </div>
         <div>
-          <p class="block-title">Risk notes</p>
+          <p class="block-title">風險提醒</p>
           <ul class="reason-list risk-reasons"></ul>
         </div>
       </div>

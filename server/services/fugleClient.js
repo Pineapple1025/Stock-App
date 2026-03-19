@@ -95,9 +95,9 @@ async function getKDJ(symbol, options = {}) {
   return request(`/technical/kdj/${symbol}`, {
     ...range,
     timeframe: options.timeframe || "D",
-    period: options.period || 9,
-    signalK: options.signalK || 3,
-    signalD: options.signalD || 3
+    rPeriod: options.rPeriod || 9,
+    kPeriod: options.kPeriod || 3,
+    dPeriod: options.dPeriod || 3
   });
 }
 
