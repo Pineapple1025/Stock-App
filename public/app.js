@@ -765,7 +765,7 @@ function renderDetailCharts(detail) {
 function renderDetail(detail) {
   state.selectedSymbol = detail.symbol;
   state.detail = detail;
-  elements.detailTitle.textContent = "????";
+  elements.detailTitle.textContent = "單股分析";
   elements.detailDateLabel.textContent = detail.quote.tradeDate ? `交易日期 ${detail.quote.tradeDate}` : "尚未取得交易日期";
   elements.detailSymbol.textContent = detail.symbol;
   elements.detailName.textContent = detail.quote.name || detail.symbol;
@@ -802,15 +802,15 @@ function renderDetail(detail) {
   elements.detailMetrics.innerHTML = `
     <section class="metrics-panel">
       <div class="metrics-panel-head">
-        <span class="panel-label">????</span>
+        <span class="panel-label">報價總覽</span>
       </div>
       <div class="metrics-panel-grid">
         ${[
-          { label: "??", value: detail.quote.openPrice },
-          { label: "??", value: detail.quote.highPrice },
-          { label: "??", value: detail.quote.lowPrice },
-          { label: "??", value: detail.quote.previousClose },
-          { label: "???", value: detail.quote.tradeVolume, digits: 0 }
+          { label: "開盤", value: detail.quote.openPrice },
+          { label: "最高", value: detail.quote.highPrice },
+          { label: "最低", value: detail.quote.lowPrice },
+          { label: "昨收", value: detail.quote.previousClose },
+          { label: "成交量", value: detail.quote.tradeVolume, digits: 0 }
         ].map((item) => `<div class="metric-chip"><span>${item.label}</span><strong>${formatNumber(item.value, item.digits ?? 2)}</strong></div>`).join("")}
       </div>
     </section>
@@ -824,8 +824,8 @@ function renderDetail(detail) {
 function renderDetailError(message) {
   state.detail = null;
   state.selectedSymbol = "";
-  elements.detailTitle.textContent = "????";
-  elements.detailDateLabel.textContent = "????";
+  elements.detailTitle.textContent = "單股分析";
+  elements.detailDateLabel.textContent = "查詢失敗";
   elements.detailSymbol.textContent = "-";
   elements.detailName.textContent = message;
   elements.detailClosePrice.textContent = "-";
@@ -846,7 +846,7 @@ function renderDetailError(message) {
 }
 
 function renderDetailLoading(symbol) {
-  elements.detailTitle.textContent = "????";
+  elements.detailTitle.textContent = "單股分析";
   setDetailState("正在整理單股資料與技術圖表...");
 }
 
