@@ -84,6 +84,13 @@ function formatNumber(value) {
     : Number(value).toLocaleString("zh-TW", { maximumFractionDigits: 2 });
 }
 
+function average(values) {
+  if (!values.length) {
+    return null;
+  }
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 function setDetailState(message) {
   elements.detailState.textContent = message || "";
 }
@@ -232,6 +239,14 @@ function polylinePoints(values, width, height, padding) {
   }).join(" ");
 }
 
+function axisLabels(min, max) {
+  return {
+    high: formatNumber(max),
+    low: formatNumber(min),
+    mid: formatNumber((min + max) / 2)
+  };
+}
+
 function renderPriceChart(detail) {
   const candles = detail.series.candles.slice(-60);
   if (!candles.length) {
@@ -244,8 +259,15 @@ function renderPriceChart(detail) {
   const padding = 20;
   const closes = candles.map((item) => Number(item.close)).filter(Number.isFinite);
   const volumes = candles.map((item) => Number(item.volume)).filter(Number.isFinite);
+  const dates = candles.map((item) => item.date);
   const points = polylinePoints(closes, width, height, padding);
   const volumeMax = Math.max(...volumes, 1);
+  const closeMin = Math.min(...closes);
+  const closeMax = Math.max(...closes);
+  const volumeAvg = average(volumes);
+  const latestClose = closes[closes.length - 1];
+  const latestVolume = volumes[volumes.length - 1];
+  const closeLabels = axisLabels(closeMin, closeMax);
 
   const bars = candles.map((item, index) => {
     const x = padding + (index * (width - padding * 2)) / Math.max(1, candles.length - 1);
@@ -257,11 +279,42 @@ function renderPriceChart(detail) {
   }).join("");
 
   elements.priceChart.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="股價與成交量圖">
-      <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.12)" />
-      ${bars}
-      <polyline fill="none" stroke="#0b6e69" stroke-width="3" points="${points}" />
-    </svg>
+    <div class="chart-insights">
+      <div class="chart-stat">
+        <span>最新收盤</span>
+        <strong>${formatNumber(latestClose)}</strong>
+      </div>
+      <div class="chart-stat">
+        <span>60 日高低</span>
+        <strong>${formatNumber(closeMax)} / ${formatNumber(closeMin)}</strong>
+      </div>
+      <div class="chart-stat">
+        <span>最新成交量</span>
+        <strong>${formatNumber(latestVolume)}</strong>
+      </div>
+      <div class="chart-stat">
+        <span>平均量</span>
+        <strong>${formatNumber(volumeAvg)}</strong>
+      </div>
+    </div>
+    <div class="chart-legend">
+      <span><i class="legend-dot legend-price"></i>收盤價</span>
+      <span><i class="legend-dot legend-volume"></i>成交量</span>
+      <span class="chart-caption">區間 ${dates[0]} 至 ${dates[dates.length - 1]}</span>
+    </div>
+    <div class="chart-svg-wrap">
+      <div class="chart-y-axis">
+        <span>${closeLabels.high}</span>
+        <span>${closeLabels.mid}</span>
+        <span>${closeLabels.low}</span>
+      </div>
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="股價與成交量圖">
+        <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.12)" />
+        <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.08)" />
+        ${bars}
+        <polyline fill="none" stroke="#0b6e69" stroke-width="3" points="${points}" />
+      </svg>
+    </div>
   `;
 }
 
@@ -280,19 +333,65 @@ function renderIndicatorChart(detail) {
   const signalLine = macdRows.map((item) => Number(item.signalLine)).filter(Number.isFinite);
   const kLine = kdjRows.map((item) => Number(item.k)).filter(Number.isFinite);
   const dLine = kdjRows.map((item) => Number(item.d)).filter(Number.isFinite);
+  const histogram = macdRows.map((item) => Number(item.histogram)).filter(Number.isFinite);
   const macdPoints = polylinePoints(macdLine, width, height, padding);
   const signalPoints = polylinePoints(signalLine, width, height, padding);
   const kPoints = polylinePoints(kLine, width, height, padding);
   const dPoints = polylinePoints(dLine, width, height, padding);
+  const latestMacd = macdRows[macdRows.length - 1];
+  const latestKdj = kdjRows[kdjRows.length - 1];
+  const macdMomentum = latestMacd && Number.isFinite(latestMacd.macdLine) && Number.isFinite(latestMacd.signalLine)
+    ? latestMacd.macdLine >= latestMacd.signalLine ? "MACD 偏多" : "MACD 偏空"
+    : "MACD 資料不足";
+  const kdjMomentum = latestKdj && Number.isFinite(latestKdj.k) && Number.isFinite(latestKdj.d)
+    ? latestKdj.k >= latestKdj.d ? "KD 黃金交叉區" : "KD 修正區"
+    : "KD 資料不足";
+  const indicatorSource = [...macdLine, ...signalLine, ...kLine, ...dLine].filter(Number.isFinite);
+  const indicatorMin = indicatorSource.length ? Math.min(...indicatorSource) : 0;
+  const indicatorMax = indicatorSource.length ? Math.max(...indicatorSource) : 100;
+  const indicatorLabels = axisLabels(indicatorMin, indicatorMax);
+  const histogramValue = histogram.length ? histogram[histogram.length - 1] : (latestMacd?.histogram ?? null);
 
   elements.indicatorChart.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="MACD 與 KDJ 圖">
-      <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.12)" />
-      <polyline fill="none" stroke="#d46a1f" stroke-width="2.5" points="${macdPoints}" />
-      <polyline fill="none" stroke="#2c69d1" stroke-width="2.5" points="${signalPoints}" />
-      <polyline fill="none" stroke="#0b6e69" stroke-width="2" points="${kPoints}" />
-      <polyline fill="none" stroke="#7a445f" stroke-width="2" points="${dPoints}" />
-    </svg>
+    <div class="chart-insights">
+      <div class="chart-stat">
+        <span>最新 MACD</span>
+        <strong>${formatNumber(latestMacd?.macdLine)}</strong>
+      </div>
+      <div class="chart-stat">
+        <span>Signal / 柱狀體</span>
+        <strong>${formatNumber(latestMacd?.signalLine)} / ${formatNumber(histogramValue)}</strong>
+      </div>
+      <div class="chart-stat">
+        <span>最新 K / D</span>
+        <strong>${formatNumber(latestKdj?.k)} / ${formatNumber(latestKdj?.d)}</strong>
+      </div>
+      <div class="chart-stat">
+        <span>動能判讀</span>
+        <strong>${macdMomentum} · ${kdjMomentum}</strong>
+      </div>
+    </div>
+    <div class="chart-legend">
+      <span><i class="legend-dot legend-macd"></i>MACD</span>
+      <span><i class="legend-dot legend-signal"></i>Signal</span>
+      <span><i class="legend-dot legend-k"></i>K</span>
+      <span><i class="legend-dot legend-d"></i>D</span>
+    </div>
+    <div class="chart-svg-wrap">
+      <div class="chart-y-axis">
+        <span>${indicatorLabels.high}</span>
+        <span>${indicatorLabels.mid}</span>
+        <span>${indicatorLabels.low}</span>
+      </div>
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="MACD 與 KDJ 圖">
+        <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.12)" />
+        <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.08)" />
+        <polyline fill="none" stroke="#d46a1f" stroke-width="2.5" points="${macdPoints}" />
+        <polyline fill="none" stroke="#2c69d1" stroke-width="2.5" points="${signalPoints}" />
+        <polyline fill="none" stroke="#0b6e69" stroke-width="2" points="${kPoints}" />
+        <polyline fill="none" stroke="#7a445f" stroke-width="2" points="${dPoints}" />
+      </svg>
+    </div>
   `;
 }
 
