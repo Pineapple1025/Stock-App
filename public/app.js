@@ -1,7 +1,26 @@
+const BUILD_VERSION = "20260319-watchlist-1";
+const WATCHLIST_STORAGE_KEY = "stock-app-watchlists-v1";
+
 const HORIZONS = {
   short: { label: "短期" },
   mid: { label: "中期" },
   long: { label: "長期" }
+};
+
+const RANGE_OPTIONS = [
+  { key: "1d", label: "當日", count: 1 },
+  { key: "3d", label: "三日", count: 3 },
+  { key: "5d", label: "五日", count: 5 },
+  { key: "1m", label: "近月", count: 22 },
+  { key: "3m", label: "三月", count: 66 },
+  { key: "6m", label: "六月", count: 132 },
+  { key: "1y", label: "一年", count: 264 }
+];
+
+const DEFAULT_WATCHLIST = {
+  id: "default",
+  name: "我的自選",
+  stocks: []
 };
 
 const state = {
@@ -9,7 +28,12 @@ const state = {
   sector: "ai",
   horizon: "short",
   view: "home",
-  selectedSymbol: ""
+  selectedSymbol: "",
+  detailRange: "1m",
+  detail: null,
+  watchlists: [],
+  activeWatchlistId: DEFAULT_WATCHLIST.id,
+  watchlistDrawerOpen: false
 };
 
 const elements = {
@@ -24,6 +48,10 @@ const elements = {
   topStockLabel: document.querySelector("#topStockLabel"),
   dataSourceBadge: document.querySelector("#dataSourceBadge"),
   refreshButton: document.querySelector("#refreshButton"),
+  watchlistManagerButton: document.querySelector("#watchlistManagerButton"),
+  watchlistQuickOpenButton: document.querySelector("#watchlistQuickOpenButton"),
+  activeWatchlistName: document.querySelector("#activeWatchlistName"),
+  watchlistPreview: document.querySelector("#watchlistPreview"),
   template: document.querySelector("#stockCardTemplate"),
   stockSearchForm: document.querySelector("#stockSearchForm"),
   stockSymbolInput: document.querySelector("#stockSymbolInput"),
@@ -37,29 +65,258 @@ const elements = {
   detailHorizonScores: document.querySelector("#detailHorizonScores"),
   detailMetrics: document.querySelector("#detailMetrics"),
   indicatorSnapshot: document.querySelector("#indicatorSnapshot"),
-  windowTable: document.querySelector("#windowTable"),
   detailBullishReasons: document.querySelector("#detailBullishReasons"),
   detailRiskReasons: document.querySelector("#detailRiskReasons"),
   priceChart: document.querySelector("#priceChart"),
   indicatorChart: document.querySelector("#indicatorChart"),
   detailState: document.querySelector("#detailState"),
   backToHomeButton: document.querySelector("#backToHomeButton"),
-  detailCard: document.querySelector("#detailCard")
+  detailCard: document.querySelector("#detailCard"),
+  detailRangeTabs: document.querySelector("#detailRangeTabs"),
+  detailFavoriteButton: document.querySelector("#detailFavoriteButton"),
+  watchlistDrawer: document.querySelector("#watchlistDrawer"),
+  closeWatchlistDrawerButton: document.querySelector("#closeWatchlistDrawerButton"),
+  watchlistTabs: document.querySelector("#watchlistTabs"),
+  watchlistItems: document.querySelector("#watchlistItems"),
+  watchlistDrawerTitle: document.querySelector("#watchlistDrawerTitle"),
+  watchlistDrawerMeta: document.querySelector("#watchlistDrawerMeta"),
+  watchlistManagerState: document.querySelector("#watchlistManagerState"),
+  watchlistCreateForm: document.querySelector("#watchlistCreateForm"),
+  watchlistCreateInput: document.querySelector("#watchlistCreateInput"),
+  watchlistRenameForm: document.querySelector("#watchlistRenameForm"),
+  watchlistRenameInput: document.querySelector("#watchlistRenameInput"),
+  deleteWatchlistButton: document.querySelector("#deleteWatchlistButton")
 };
 
-async function fetchJson(url) {
-  const requestUrl = url.includes("?")
-    ? `${url}&_ts=${Date.now()}`
-    : `${url}?_ts=${Date.now()}`;
-  const response = await fetch(requestUrl, {
-    cache: "no-store"
+function makeId() {
+  return `list-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+}
+
+function loadWatchlists() {
+  try {
+    const raw = localStorage.getItem(WATCHLIST_STORAGE_KEY);
+    if (!raw) {
+      state.watchlists = [{ ...DEFAULT_WATCHLIST }];
+      return;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed.watchlists) || !parsed.watchlists.length) {
+      state.watchlists = [{ ...DEFAULT_WATCHLIST }];
+      return;
+    }
+
+    state.watchlists = parsed.watchlists.map((watchlist) => ({
+      id: watchlist.id || makeId(),
+      name: watchlist.name || "未命名組合",
+      stocks: Array.isArray(watchlist.stocks) ? watchlist.stocks : []
+    }));
+    state.activeWatchlistId = parsed.activeWatchlistId || state.watchlists[0].id;
+  } catch {
+    state.watchlists = [{ ...DEFAULT_WATCHLIST }];
+    state.activeWatchlistId = DEFAULT_WATCHLIST.id;
+  }
+}
+
+function saveWatchlists() {
+  localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify({
+    activeWatchlistId: state.activeWatchlistId,
+    watchlists: state.watchlists
+  }));
+}
+
+function getActiveWatchlist() {
+  return state.watchlists.find((watchlist) => watchlist.id === state.activeWatchlistId) || state.watchlists[0];
+}
+
+function isStockInActiveWatchlist(symbol) {
+  const active = getActiveWatchlist();
+  return active?.stocks.some((stock) => stock.symbol === symbol);
+}
+
+function updateFavoriteButton(button, symbol) {
+  const active = isStockInActiveWatchlist(symbol);
+  button.classList.toggle("is-active", active);
+  button.textContent = active ? "♥" : "♡";
+  button.setAttribute("aria-pressed", String(active));
+  button.title = active ? "從目前自選移除" : "加入目前自選";
+}
+
+function persistAndRenderWatchlists() {
+  saveWatchlists();
+  renderWatchlistPreview();
+  renderWatchlistDrawer();
+  syncFavoriteButtons();
+}
+
+function addStockToActiveWatchlist(stock) {
+  const active = getActiveWatchlist();
+  if (!active) {
+    return;
+  }
+
+  const exists = active.stocks.some((item) => item.symbol === stock.symbol);
+  if (exists) {
+    active.stocks = active.stocks.filter((item) => item.symbol !== stock.symbol);
+    elements.watchlistManagerState.textContent = `${stock.symbol} 已從「${active.name}」移除。`;
+  } else {
+    active.stocks.unshift({
+      symbol: stock.symbol,
+      name: stock.name || stock.symbol
+    });
+    elements.watchlistManagerState.textContent = `${stock.symbol} 已加入「${active.name}」。`;
+  }
+  persistAndRenderWatchlists();
+}
+
+function createWatchlist(name) {
+  state.watchlists.push({
+    id: makeId(),
+    name,
+    stocks: []
   });
+  state.activeWatchlistId = state.watchlists.at(-1).id;
+  persistAndRenderWatchlists();
+}
+
+function renameActiveWatchlist(name) {
+  const active = getActiveWatchlist();
+  if (!active) {
+    return;
+  }
+  active.name = name;
+  persistAndRenderWatchlists();
+}
+
+function deleteActiveWatchlist() {
+  if (state.watchlists.length <= 1) {
+    elements.watchlistManagerState.textContent = "至少要保留一個自選組合。";
+    return;
+  }
+
+  const index = state.watchlists.findIndex((watchlist) => watchlist.id === state.activeWatchlistId);
+  if (index === -1) {
+    return;
+  }
+
+  const removed = state.watchlists[index];
+  state.watchlists.splice(index, 1);
+  state.activeWatchlistId = state.watchlists[Math.max(0, index - 1)].id;
+  elements.watchlistManagerState.textContent = `已刪除「${removed.name}」。`;
+  persistAndRenderWatchlists();
+}
+
+function openWatchlistDrawer() {
+  state.watchlistDrawerOpen = true;
+  elements.watchlistDrawer.hidden = false;
+  document.body.classList.add("watchlist-open");
+  renderWatchlistDrawer();
+}
+
+function closeWatchlistDrawer() {
+  state.watchlistDrawerOpen = false;
+  elements.watchlistDrawer.hidden = true;
+  document.body.classList.remove("watchlist-open");
+}
+
+function renderWatchlistPreview() {
+  const active = getActiveWatchlist();
+  elements.activeWatchlistName.textContent = active?.name || "我的自選";
+
+  if (!active || !active.stocks.length) {
+    elements.watchlistPreview.innerHTML = '<p class="muted">還沒有收藏股票，點卡片右上角愛心就能加入目前自選。</p>';
+    return;
+  }
+
+  elements.watchlistPreview.innerHTML = active.stocks.slice(0, 5).map((stock) => `
+    <button class="watchlist-preview-item" type="button" data-symbol="${stock.symbol}">
+      <strong>${stock.symbol}</strong>
+      <span>${stock.name}</span>
+    </button>
+  `).join("");
+
+  elements.watchlistPreview.querySelectorAll("[data-symbol]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const { symbol } = button.dataset;
+      elements.stockSymbolInput.value = symbol;
+      loadStockDetail(symbol, { focus: true, pushHistory: true });
+    });
+  });
+}
+
+function renderWatchlistDrawer() {
+  const active = getActiveWatchlist();
+  elements.watchlistTabs.innerHTML = "";
+
+  state.watchlists.forEach((watchlist) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "watchlist-tab";
+    button.textContent = watchlist.name;
+    button.classList.toggle("active", watchlist.id === state.activeWatchlistId);
+    button.addEventListener("click", () => {
+      state.activeWatchlistId = watchlist.id;
+      persistAndRenderWatchlists();
+    });
+    elements.watchlistTabs.appendChild(button);
+  });
+
+  elements.watchlistDrawerTitle.textContent = active?.name || "我的自選";
+  elements.watchlistDrawerMeta.textContent = `${active?.stocks.length || 0} 檔股票`;
+  elements.watchlistRenameInput.value = active?.name || "";
+  elements.deleteWatchlistButton.disabled = state.watchlists.length <= 1;
+
+  if (!active || !active.stocks.length) {
+    elements.watchlistItems.innerHTML = '<div class="note-card"><h3>目前沒有收藏</h3><p>從產業排行或單股頁點愛心，就能把股票加入目前自選組合。</p></div>';
+    return;
+  }
+
+  elements.watchlistItems.innerHTML = active.stocks.map((stock) => `
+    <article class="watchlist-item">
+      <button class="watchlist-item-main" type="button" data-open-symbol="${stock.symbol}">
+        <strong>${stock.symbol}</strong>
+        <span>${stock.name}</span>
+      </button>
+      <button class="favorite-button is-active" type="button" data-remove-symbol="${stock.symbol}" aria-label="移除此股票">♥</button>
+    </article>
+  `).join("");
+
+  elements.watchlistItems.querySelectorAll("[data-open-symbol]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const { openSymbol } = button.dataset;
+      closeWatchlistDrawer();
+      elements.stockSymbolInput.value = openSymbol;
+      loadStockDetail(openSymbol, { focus: true, pushHistory: true });
+    });
+  });
+
+  elements.watchlistItems.querySelectorAll("[data-remove-symbol]").forEach((button) => {
+    button.addEventListener("click", () => {
+      addStockToActiveWatchlist({ symbol: button.dataset.removeSymbol });
+    });
+  });
+}
+
+function syncFavoriteButtons() {
+  document.querySelectorAll("[data-favorite-symbol]").forEach((button) => {
+    updateFavoriteButton(button, button.dataset.favoriteSymbol);
+  });
+
+  if (state.selectedSymbol) {
+    updateFavoriteButton(elements.detailFavoriteButton, state.selectedSymbol);
+  } else {
+    elements.detailFavoriteButton.classList.remove("is-active");
+    elements.detailFavoriteButton.textContent = "♡";
+  }
+}
+
+async function fetchJson(url) {
+  const requestUrl = url.includes("?") ? `${url}&_ts=${Date.now()}` : `${url}?_ts=${Date.now()}`;
+  const response = await fetch(requestUrl, { cache: "no-store" });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = body.message || `請求失敗，狀態碼 ${response.status}`;
-    const error = new Error(message);
-    error.status = response.status;
-    throw error;
+    const message = body.message || `資料載入失敗，狀態碼 ${response.status}`;
+    throw new Error(message);
   }
   return body;
 }
@@ -68,10 +325,10 @@ function stars(count) {
   return String.fromCharCode(9733).repeat(count) + String.fromCharCode(9734).repeat(5 - count);
 }
 
-function formatNumber(value) {
-  return value === null || value === undefined || Number.isNaN(value)
+function formatNumber(value, digits = 2) {
+  return value === null || value === undefined || Number.isNaN(Number(value))
     ? "-"
-    : Number(value).toLocaleString("zh-TW", { maximumFractionDigits: 2 });
+    : Number(value).toLocaleString("zh-TW", { maximumFractionDigits: digits });
 }
 
 function average(values) {
@@ -150,8 +407,8 @@ function renderHorizonTabs() {
     button.addEventListener("click", () => {
       state.horizon = key;
       loadAnalysis();
-      if (elements.stockSymbolInput.value.trim()) {
-        loadStockDetail(elements.stockSymbolInput.value.trim());
+      if (state.detail) {
+        renderDetail(state.detail);
       }
     });
     elements.horizonTabs.appendChild(button);
@@ -163,20 +420,29 @@ function renderSummary(result) {
   const topStock = result.stocks[0];
   const bullishCount = result.stocks.filter((stock) => stock.analysis.score >= 60).length;
 
-  elements.resultTitle.textContent = `${activeSector?.label || "分類"} ${HORIZONS[state.horizon].label}分析`;
+  elements.resultTitle.textContent = `${activeSector?.label || "產業"} ${HORIZONS[state.horizon].label}分析`;
   elements.generatedAtLabel.textContent = `更新時間 ${new Date(result.generatedAt).toLocaleString("zh-TW")}`;
   elements.activeSectorLabel.textContent = activeSector?.label || "-";
   elements.activeHorizonLabel.textContent = HORIZONS[state.horizon].label;
   elements.bullishCount.textContent = `${bullishCount} 檔`;
-  elements.topStockLabel.textContent = topStock ? `${topStock.name} ${stars(topStock.analysis.stars)}` : "尚無資料";
+  elements.topStockLabel.textContent = topStock ? `${topStock.name} ${stars(topStock.analysis.stars)}` : "暫無資料";
   elements.dataSourceBadge.textContent = result.dataSource === "fugle" ? "Fugle 即時資料" : "Fugle + 備援資料";
+}
+
+function bindFavoriteButton(button, stock) {
+  button.dataset.favoriteSymbol = stock.symbol;
+  updateFavoriteButton(button, stock.symbol);
+  button.onclick = (event) => {
+    event.stopPropagation();
+    addStockToActiveWatchlist(stock);
+  };
 }
 
 function renderStocks(result) {
   elements.stockList.innerHTML = "";
 
   if (!result.stocks.length) {
-    elements.stockList.innerHTML = '<article class="note-card"><h3>目前沒有資料</h3><p>這個分類暫時沒有可分析的股票，請稍後再試。</p></article>';
+    elements.stockList.innerHTML = '<article class="note-card"><h3>目前沒有資料</h3><p>請稍後再試，或切換其他產業與週期。</p></article>';
     return;
   }
 
@@ -188,10 +454,15 @@ function renderStocks(result) {
     fragment.querySelector(".score-value").textContent = `${stock.analysis.score} 分`;
     fragment.querySelector(".star-rating").textContent = stars(stock.analysis.stars);
     fragment.querySelector(".signal-pill").textContent = stock.analysis.biasLabel;
-    fragment.querySelector(".confidence-pill").textContent = `信心度 ${stock.analysis.confidence}%`;
+    fragment.querySelector(".confidence-pill").textContent = `信心 ${stock.analysis.confidence}%`;
 
     appendListItems(fragment.querySelector(".bullish-reasons"), stock.analysis.bullishReasons, "目前沒有明確看漲因素。");
-    appendListItems(fragment.querySelector(".risk-reasons"), stock.analysis.riskReasons, "目前沒有顯著風險提醒。");
+    appendListItems(fragment.querySelector(".risk-reasons"), stock.analysis.riskReasons, "目前沒有明確風險提醒。");
+
+    bindFavoriteButton(fragment.querySelector(".card-favorite-button"), {
+      symbol: stock.symbol,
+      name: stock.name
+    });
 
     card.style.cursor = "pointer";
     card.addEventListener("click", () => {
@@ -203,18 +474,29 @@ function renderStocks(result) {
   });
 }
 
-function polylinePoints(values, width, height, padding) {
+function getRangeOption(key) {
+  return RANGE_OPTIONS.find((item) => item.key === key) || RANGE_OPTIONS[3];
+}
+
+function takeLast(items, count) {
+  if (!Array.isArray(items) || !items.length) {
+    return [];
+  }
+  return items.slice(-count);
+}
+
+function polylinePoints(values, width, height, padding, min, max) {
   if (!values.length) {
     return "";
   }
 
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
+  const rangeMin = Number.isFinite(min) ? min : Math.min(...values);
+  const rangeMax = Number.isFinite(max) ? max : Math.max(...values);
+  const range = rangeMax - rangeMin || 1;
 
   return values.map((value, index) => {
     const x = padding + (index * (width - padding * 2)) / Math.max(1, values.length - 1);
-    const y = height - padding - ((value - min) / range) * (height - padding * 2);
+    const y = height - padding - ((value - rangeMin) / range) * (height - padding * 2);
     return `${x},${y}`;
   }).join(" ");
 }
@@ -222,65 +504,126 @@ function polylinePoints(values, width, height, padding) {
 function axisLabels(min, max) {
   return {
     high: formatNumber(max),
-    low: formatNumber(min),
-    mid: formatNumber((min + max) / 2)
+    mid: formatNumber((min + max) / 2),
+    low: formatNumber(min)
   };
 }
 
+function getRangeSeries(detail) {
+  const range = getRangeOption(state.detailRange);
+  return {
+    range,
+    candles: takeLast(detail.series.candles || [], range.count),
+    macd: takeLast(detail.series.macd || [], range.count),
+    kdj: takeLast(detail.series.kdj || [], range.count),
+    window: detail.windows?.[range.key] || {}
+  };
+}
+
+function buildIndicatorSnapshot(detail) {
+  const { range, window } = getRangeSeries(detail);
+  const latestMacd = detail.latestIndicators.macd || {};
+  const latestKdj = detail.latestIndicators.kdj || {};
+
+  elements.indicatorSnapshot.innerHTML = [
+    {
+      label: `${range.label}收盤`,
+      value: window.close,
+      note: `成交量 ${formatNumber(window.volume, 0)}`
+    },
+    {
+      label: `${range.label}MACD`,
+      value: window.macdLine ?? latestMacd.macdLine,
+      note: `Signal ${formatNumber(window.signalLine ?? latestMacd.signalLine)}`
+    },
+    {
+      label: `${range.label}KD`,
+      value: window.k ?? latestKdj.k,
+      note: `D ${formatNumber(window.d ?? latestKdj.d)} / J ${formatNumber(window.j ?? latestKdj.j)}`
+    },
+    {
+      label: "圖表重點",
+      value: range.label,
+      note: "切換日期區間時，價格與技術圖表會同步更新。"
+    }
+  ].map((card) => `
+    <div class="compact-indicator-card">
+      <span>${card.label}</span>
+      <strong>${formatNumber(card.value)}</strong>
+      <small>${card.note}</small>
+    </div>
+  `).join("");
+}
+
+function renderRangeTabs() {
+  elements.detailRangeTabs.innerHTML = "";
+  RANGE_OPTIONS.forEach((option) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "range-tab";
+    button.textContent = option.label;
+    button.classList.toggle("active", option.key === state.detailRange);
+    button.addEventListener("click", () => {
+      state.detailRange = option.key;
+      if (state.detail) {
+        renderDetailCharts(state.detail);
+      }
+    });
+    elements.detailRangeTabs.appendChild(button);
+  });
+}
+
 function renderPriceChart(detail) {
-  const candles = detail.series.candles.slice(-60);
+  const { range, candles, window } = getRangeSeries(detail);
   if (!candles.length) {
     elements.priceChart.innerHTML = "<p>目前沒有足夠的價格資料。</p>";
     return;
   }
 
   const width = 640;
-  const height = 220;
-  const padding = 20;
+  const height = 240;
+  const padding = 24;
   const closes = candles.map((item) => Number(item.close)).filter(Number.isFinite);
   const volumes = candles.map((item) => Number(item.volume)).filter(Number.isFinite);
   const dates = candles.map((item) => item.date);
-  const points = polylinePoints(closes, width, height, padding);
-  const volumeMax = Math.max(...volumes, 1);
   const closeMin = Math.min(...closes);
   const closeMax = Math.max(...closes);
-  const volumeAvg = average(volumes);
-  const latestClose = closes[closes.length - 1];
-  const latestVolume = volumes[volumes.length - 1];
   const closeLabels = axisLabels(closeMin, closeMax);
+  const volumeMax = Math.max(...volumes, 1);
+  const volumeAvg = average(volumes);
+  const points = polylinePoints(closes, width, height, padding);
 
   const bars = candles.map((item, index) => {
     const x = padding + (index * (width - padding * 2)) / Math.max(1, candles.length - 1);
-    const barWidth = 4;
-    const value = Number(item.volume) || 0;
-    const barHeight = (value / volumeMax) * 60;
+    const barWidth = Math.max(4, (width - padding * 2) / Math.max(candles.length * 2, 16));
+    const barHeight = ((Number(item.volume) || 0) / volumeMax) * 64;
     const y = height - padding - barHeight;
-    return `<rect x="${x - barWidth / 2}" y="${y}" width="${barWidth}" height="${barHeight}" fill="rgba(44,105,209,0.18)" rx="2" />`;
+    return `<rect x="${x - barWidth / 2}" y="${y}" width="${barWidth}" height="${barHeight}" fill="rgba(44, 105, 209, 0.18)" rx="2" />`;
   }).join("");
 
   elements.priceChart.innerHTML = `
     <div class="chart-insights">
       <div class="chart-stat">
-        <span>最新收盤</span>
-        <strong>${formatNumber(latestClose)}</strong>
+        <span>${range.label}收盤</span>
+        <strong>${formatNumber(window.close ?? closes.at(-1))}</strong>
       </div>
       <div class="chart-stat">
-        <span>60 日高低</span>
-        <strong>${formatNumber(closeMax)} / ${formatNumber(closeMin)}</strong>
+        <span>${range.label}高 / 低</span>
+        <strong>${formatNumber(window.high ?? closeMax)} / ${formatNumber(window.low ?? closeMin)}</strong>
       </div>
       <div class="chart-stat">
-        <span>最新成交量</span>
-        <strong>${formatNumber(latestVolume)}</strong>
+        <span>${range.label}成交量</span>
+        <strong>${formatNumber(window.volume ?? volumes.at(-1), 0)}</strong>
       </div>
       <div class="chart-stat">
         <span>平均量</span>
-        <strong>${formatNumber(volumeAvg)}</strong>
+        <strong>${formatNumber(volumeAvg, 0)}</strong>
       </div>
     </div>
     <div class="chart-legend">
-      <span><i class="legend-dot legend-price"></i>收盤價</span>
+      <span><i class="legend-dot legend-price"></i>收盤走勢</span>
       <span><i class="legend-dot legend-volume"></i>成交量</span>
-      <span class="chart-caption">區間 ${dates[0]} 至 ${dates[dates.length - 1]}</span>
+      <span class="chart-caption">${dates[0]} 至 ${dates[dates.length - 1]}</span>
     </div>
     <div class="chart-svg-wrap">
       <div class="chart-y-axis">
@@ -288,7 +631,7 @@ function renderPriceChart(detail) {
         <span>${closeLabels.mid}</span>
         <span>${closeLabels.low}</span>
       </div>
-      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="股價與成交量圖">
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${range.label}價格與成交量圖">
         <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.12)" />
         <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.08)" />
         ${bars}
@@ -299,56 +642,56 @@ function renderPriceChart(detail) {
 }
 
 function renderIndicatorChart(detail) {
-  const macdRows = detail.series.macd.slice(-60);
-  const kdjRows = detail.series.kdj.slice(-60);
-  if (!macdRows.length && !kdjRows.length) {
+  const { range, macd, kdj } = getRangeSeries(detail);
+  if (!macd.length && !kdj.length) {
     elements.indicatorChart.innerHTML = "<p>目前沒有足夠的技術指標資料。</p>";
     return;
   }
 
   const width = 640;
-  const height = 220;
-  const padding = 20;
-  const macdLine = macdRows.map((item) => Number(item.macdLine)).filter(Number.isFinite);
-  const signalLine = macdRows.map((item) => Number(item.signalLine)).filter(Number.isFinite);
-  const kLine = kdjRows.map((item) => Number(item.k)).filter(Number.isFinite);
-  const dLine = kdjRows.map((item) => Number(item.d)).filter(Number.isFinite);
-  const histogram = macdRows.map((item) => Number(item.histogram)).filter(Number.isFinite);
-  const macdPoints = polylinePoints(macdLine, width, height, padding);
-  const signalPoints = polylinePoints(signalLine, width, height, padding);
-  const kPoints = polylinePoints(kLine, width, height, padding);
-  const dPoints = polylinePoints(dLine, width, height, padding);
-  const latestMacd = macdRows[macdRows.length - 1];
-  const latestKdj = kdjRows[kdjRows.length - 1];
-  const macdMomentum = latestMacd && Number.isFinite(latestMacd.macdLine) && Number.isFinite(latestMacd.signalLine)
-    ? latestMacd.macdLine >= latestMacd.signalLine ? "MACD 偏多" : "MACD 偏空"
-    : "MACD 資料不足";
-  const kdjMomentum = latestKdj && Number.isFinite(latestKdj.k) && Number.isFinite(latestKdj.d)
-    ? latestKdj.k >= latestKdj.d ? "KD 黃金交叉區" : "KD 修正區"
-    : "KD 資料不足";
-  const indicatorSource = [...macdLine, ...signalLine, ...kLine, ...dLine].filter(Number.isFinite);
-  const indicatorMin = indicatorSource.length ? Math.min(...indicatorSource) : 0;
-  const indicatorMax = indicatorSource.length ? Math.max(...indicatorSource) : 100;
-  const indicatorLabels = axisLabels(indicatorMin, indicatorMax);
-  const histogramValue = histogram.length ? histogram[histogram.length - 1] : (latestMacd?.histogram ?? null);
+  const height = 240;
+  const padding = 24;
+  const macdLine = macd.map((item) => Number(item.macdLine)).filter(Number.isFinite);
+  const signalLine = macd.map((item) => Number(item.signalLine)).filter(Number.isFinite);
+  const histogram = macd.map((item) => Number(item.histogram)).filter(Number.isFinite);
+  const kLine = kdj.map((item) => Number(item.k)).filter(Number.isFinite);
+  const dLine = kdj.map((item) => Number(item.d)).filter(Number.isFinite);
+  const jLine = kdj.map((item) => Number(item.j)).filter(Number.isFinite);
+  const source = [...macdLine, ...signalLine, ...histogram, ...kLine, ...dLine, ...jLine].filter(Number.isFinite);
+  const min = source.length ? Math.min(...source) : 0;
+  const max = source.length ? Math.max(...source) : 100;
+  const labels = axisLabels(min, max);
+
+  const histogramBars = macd.map((item, index) => {
+    const value = Number(item.histogram);
+    if (!Number.isFinite(value)) {
+      return "";
+    }
+    const x = padding + (index * (width - padding * 2)) / Math.max(1, macd.length - 1);
+    const barWidth = Math.max(4, (width - padding * 2) / Math.max(macd.length * 2, 16));
+    const zeroY = height - padding - ((0 - min) / ((max - min) || 1)) * (height - padding * 2);
+    const barY = value >= 0 ? zeroY - (Math.abs(value) / ((max - min) || 1)) * (height - padding * 2) : zeroY;
+    const barHeight = (Math.abs(value) / ((max - min) || 1)) * (height - padding * 2);
+    return `<rect x="${x - barWidth / 2}" y="${barY}" width="${barWidth}" height="${barHeight}" fill="${value >= 0 ? "rgba(11,110,105,0.18)" : "rgba(212,106,31,0.18)"}" rx="2" />`;
+  }).join("");
 
   elements.indicatorChart.innerHTML = `
     <div class="chart-insights">
       <div class="chart-stat">
-        <span>最新 MACD</span>
-        <strong>${formatNumber(latestMacd?.macdLine)}</strong>
+        <span>${range.label}MACD</span>
+        <strong>${formatNumber(macd.at(-1)?.macdLine ?? detail.latestIndicators.macd?.macdLine)}</strong>
       </div>
       <div class="chart-stat">
         <span>Signal / 柱狀體</span>
-        <strong>${formatNumber(latestMacd?.signalLine)} / ${formatNumber(histogramValue)}</strong>
+        <strong>${formatNumber(macd.at(-1)?.signalLine ?? detail.latestIndicators.macd?.signalLine)} / ${formatNumber(macd.at(-1)?.histogram ?? detail.latestIndicators.macd?.histogram)}</strong>
       </div>
       <div class="chart-stat">
-        <span>最新 K / D</span>
-        <strong>${formatNumber(latestKdj?.k)} / ${formatNumber(latestKdj?.d)}</strong>
+        <span>${range.label}K / D</span>
+        <strong>${formatNumber(kdj.at(-1)?.k ?? detail.latestIndicators.kdj?.k)} / ${formatNumber(kdj.at(-1)?.d ?? detail.latestIndicators.kdj?.d)}</strong>
       </div>
       <div class="chart-stat">
-        <span>動能判讀</span>
-        <strong>${macdMomentum} · ${kdjMomentum}</strong>
+        <span>J 值</span>
+        <strong>${formatNumber(kdj.at(-1)?.j ?? detail.latestIndicators.kdj?.j)}</strong>
       </div>
     </div>
     <div class="chart-legend">
@@ -356,32 +699,43 @@ function renderIndicatorChart(detail) {
       <span><i class="legend-dot legend-signal"></i>Signal</span>
       <span><i class="legend-dot legend-k"></i>K</span>
       <span><i class="legend-dot legend-d"></i>D</span>
+      <span><i class="legend-dot legend-j"></i>J</span>
     </div>
     <div class="chart-svg-wrap">
       <div class="chart-y-axis">
-        <span>${indicatorLabels.high}</span>
-        <span>${indicatorLabels.mid}</span>
-        <span>${indicatorLabels.low}</span>
+        <span>${labels.high}</span>
+        <span>${labels.mid}</span>
+        <span>${labels.low}</span>
       </div>
-      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="MACD 與 KDJ 圖">
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${range.label}MACD 與 KDJ 圖">
         <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.12)" />
         <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.08)" />
-        <polyline fill="none" stroke="#d46a1f" stroke-width="2.5" points="${macdPoints}" />
-        <polyline fill="none" stroke="#2c69d1" stroke-width="2.5" points="${signalPoints}" />
-        <polyline fill="none" stroke="#0b6e69" stroke-width="2" points="${kPoints}" />
-        <polyline fill="none" stroke="#7a445f" stroke-width="2" points="${dPoints}" />
+        ${histogramBars}
+        <polyline fill="none" stroke="#d46a1f" stroke-width="2.5" points="${polylinePoints(macdLine, width, height, padding, min, max)}" />
+        <polyline fill="none" stroke="#2c69d1" stroke-width="2.5" points="${polylinePoints(signalLine, width, height, padding, min, max)}" />
+        <polyline fill="none" stroke="#0b6e69" stroke-width="2" points="${polylinePoints(kLine, width, height, padding, min, max)}" />
+        <polyline fill="none" stroke="#7a445f" stroke-width="2" points="${polylinePoints(dLine, width, height, padding, min, max)}" />
+        <polyline fill="none" stroke="#6b8f00" stroke-width="2" points="${polylinePoints(jLine, width, height, padding, min, max)}" />
       </svg>
     </div>
   `;
 }
 
+function renderDetailCharts(detail) {
+  renderRangeTabs();
+  buildIndicatorSnapshot(detail);
+  renderPriceChart(detail);
+  renderIndicatorChart(detail);
+}
+
 function renderDetail(detail) {
   state.selectedSymbol = detail.symbol;
+  state.detail = detail;
   elements.detailTitle.textContent = `${detail.symbol} 單股分析`;
-  elements.detailDateLabel.textContent = detail.quote.tradeDate ? `資料日期 ${detail.quote.tradeDate}` : "目前無最新日期";
+  elements.detailDateLabel.textContent = detail.quote.tradeDate ? `交易日期 ${detail.quote.tradeDate}` : "尚未取得交易日期";
   elements.detailSymbol.textContent = detail.symbol;
   elements.detailName.textContent = detail.quote.name || detail.symbol;
-  elements.detailClosePrice.textContent = detail.quote.closePrice ? formatNumber(detail.quote.closePrice) : "-";
+  elements.detailClosePrice.textContent = formatNumber(detail.quote.closePrice);
 
   const change = detail.quote.change;
   const changePercent = detail.quote.changePercent;
@@ -390,96 +744,55 @@ function renderDetail(detail) {
     : `${change >= 0 ? "+" : ""}${formatNumber(change)} (${changePercent >= 0 ? "+" : ""}${formatNumber(changePercent)}%)`;
 
   elements.detailProfileBadges.innerHTML = "";
-  [
-    detail.profile.market,
-    detail.profile.industry,
-    ...(detail.profile.sectors || []).map((sector) => sector.label)
-  ].filter(Boolean).forEach((label) => {
-    const node = document.createElement("span");
-    node.className = "detail-badge";
-    node.textContent = label;
-    elements.detailProfileBadges.appendChild(node);
-  });
+  [detail.profile.market, detail.profile.industry, ...(detail.profile.sectors || []).map((sector) => sector.label)]
+    .filter(Boolean)
+    .forEach((label) => {
+      const node = document.createElement("span");
+      node.className = "detail-badge";
+      node.textContent = label;
+      elements.detailProfileBadges.appendChild(node);
+    });
 
-  elements.detailHorizonScores.innerHTML = "";
-  [
+  elements.detailHorizonScores.innerHTML = [
     { key: "short", label: "短期" },
     { key: "mid", label: "中期" },
     { key: "long", label: "長期" }
-  ].forEach((item) => {
+  ].map((item) => {
     const score = detail.horizonScores[item.key];
-    const node = document.createElement("article");
-    node.className = "horizon-score-card";
-    node.innerHTML = `<span>${item.label}</span><strong>${score.score} 分 ${stars(score.stars)}</strong><p>${score.biasLabel}</p>`;
-    elements.detailHorizonScores.appendChild(node);
-  });
+    return `<article class="horizon-score-card"><span>${item.label}</span><strong>${score.score} 分 ${stars(score.stars)}</strong><p>${score.biasLabel}</p></article>`;
+  }).join("");
 
   const activeHorizonScore = detail.horizonScores[state.horizon];
   appendListItems(elements.detailBullishReasons, activeHorizonScore.bullishReasons, "目前沒有明確看漲因素。");
-  appendListItems(elements.detailRiskReasons, activeHorizonScore.riskReasons, "目前沒有顯著風險提醒。");
+  appendListItems(elements.detailRiskReasons, activeHorizonScore.riskReasons, "目前沒有明確風險提醒。");
 
-  elements.detailMetrics.innerHTML = "";
-  [
+  elements.detailMetrics.innerHTML = [
     { label: "開盤", value: detail.quote.openPrice },
     { label: "最高", value: detail.quote.highPrice },
     { label: "最低", value: detail.quote.lowPrice },
     { label: "昨收", value: detail.quote.previousClose },
-    { label: "成交量", value: detail.quote.tradeVolume }
-  ].forEach((item) => {
-    const node = document.createElement("div");
-    node.className = "metric-chip";
-    node.innerHTML = `<span>${item.label}</span><strong>${formatNumber(item.value)}</strong>`;
-    elements.detailMetrics.appendChild(node);
+    { label: "成交量", value: detail.quote.tradeVolume, digits: 0 }
+  ].map((item) => `
+    <div class="metric-chip">
+      <span>${item.label}</span>
+      <strong>${formatNumber(item.value, item.digits ?? 2)}</strong>
+    </div>
+  `).join("");
+
+  bindFavoriteButton(elements.detailFavoriteButton, {
+    symbol: detail.symbol,
+    name: detail.quote.name || detail.symbol
   });
 
-  elements.indicatorSnapshot.innerHTML = "";
-  [
-    { label: "MACD", value: detail.latestIndicators.macd?.macdLine },
-    { label: "Signal", value: detail.latestIndicators.macd?.signalLine },
-    { label: "柱狀體", value: detail.latestIndicators.macd?.histogram },
-    { label: "K", value: detail.latestIndicators.kdj?.k },
-    { label: "D", value: detail.latestIndicators.kdj?.d },
-    { label: "J", value: detail.latestIndicators.kdj?.j }
-  ].forEach((item) => {
-    const node = document.createElement("div");
-    node.className = "indicator-chip";
-    node.innerHTML = `<span>${item.label}</span><strong>${formatNumber(item.value)}</strong>`;
-    elements.indicatorSnapshot.appendChild(node);
-  });
-
-  elements.windowTable.innerHTML = "";
-  const labels = {
-    "1d": "當日",
-    "3d": "三日",
-    "5d": "五日",
-    "1m": "近月",
-    "3m": "三月",
-    "6m": "六月",
-    "1y": "一年"
-  };
-
-  Object.entries(labels).forEach(([key, label]) => {
-    const row = detail.windows[key] || {};
-    const node = document.createElement("div");
-    node.className = "window-row";
-    node.innerHTML = `
-      <div><span>期間</span><strong>${label}</strong></div>
-      <div><span>收盤</span><strong>${formatNumber(row.close)}</strong></div>
-      <div><span>MACD</span><strong>${formatNumber(row.macdLine)}</strong></div>
-      <div><span>K / D</span><strong>${formatNumber(row.k)} / ${formatNumber(row.d)}</strong></div>
-      <div><span>成交量</span><strong>${formatNumber(row.volume)}</strong></div>
-    `;
-    elements.windowTable.appendChild(node);
-  });
-
-  renderPriceChart(detail);
-  renderIndicatorChart(detail);
-  setDetailState(`單股資料來源 ${detail.profile.universeSource}`);
+  renderDetailCharts(detail);
+  setDetailState(`單股資料來源 ${detail.profile.universeSource} | 前端版本 ${BUILD_VERSION}`);
 }
 
 function renderDetailError(message) {
+  state.detail = null;
+  state.selectedSymbol = "";
   elements.detailTitle.textContent = "查詢失敗";
-  elements.detailDateLabel.textContent = "請重新查詢";
+  elements.detailDateLabel.textContent = "請稍後再試";
   elements.detailSymbol.textContent = "-";
   elements.detailName.textContent = message;
   elements.detailClosePrice.textContent = "-";
@@ -488,17 +801,18 @@ function renderDetailError(message) {
   elements.detailHorizonScores.innerHTML = "";
   elements.detailMetrics.innerHTML = "";
   elements.indicatorSnapshot.innerHTML = "";
-  elements.windowTable.innerHTML = "";
+  elements.detailRangeTabs.innerHTML = "";
   elements.detailBullishReasons.innerHTML = "";
   elements.detailRiskReasons.innerHTML = "";
-  elements.priceChart.innerHTML = "<p>目前沒有圖表資料。</p>";
-  elements.indicatorChart.innerHTML = "<p>目前沒有圖表資料。</p>";
+  elements.priceChart.innerHTML = "<p>目前無法顯示價格圖表。</p>";
+  elements.indicatorChart.innerHTML = "<p>目前無法顯示技術圖表。</p>";
+  syncFavoriteButtons();
   setDetailState(message);
 }
 
 function renderDetailLoading(symbol) {
   elements.detailTitle.textContent = `正在載入 ${symbol}`;
-  setDetailState("正在取得單股資料與技術指標...");
+  setDetailState("正在整理單股資料與技術圖表...");
 }
 
 async function loadSectors() {
@@ -511,14 +825,15 @@ async function loadSectors() {
 async function loadAnalysis() {
   renderSectorTabs();
   renderHorizonTabs();
-  elements.generatedAtLabel.textContent = "載入中";
+  elements.generatedAtLabel.textContent = "資料載入中";
   try {
     const result = await fetchJson(`/api/analysis?sector=${state.sector}&horizon=${state.horizon}`);
     renderSummary(result);
     renderStocks(result);
+    syncFavoriteButtons();
   } catch (error) {
-    elements.stockList.innerHTML = `<article class="note-card"><h3>載入失敗</h3><p>${error.message}</p></article>`;
-    elements.generatedAtLabel.textContent = "載入失敗";
+    elements.stockList.innerHTML = `<article class="note-card"><h3>資料載入失敗</h3><p>${error.message}</p></article>`;
+    elements.generatedAtLabel.textContent = "資料載入失敗";
     elements.dataSourceBadge.textContent = "資料載入失敗";
   }
 }
@@ -559,6 +874,49 @@ elements.refreshButton.addEventListener("click", () => {
   }
 });
 
+elements.watchlistManagerButton.addEventListener("click", openWatchlistDrawer);
+elements.watchlistQuickOpenButton.addEventListener("click", openWatchlistDrawer);
+elements.closeWatchlistDrawerButton.addEventListener("click", closeWatchlistDrawer);
+elements.watchlistDrawer.addEventListener("click", (event) => {
+  if (event.target instanceof HTMLElement && event.target.dataset.closeWatchlist === "true") {
+    closeWatchlistDrawer();
+  }
+});
+
+elements.watchlistCreateForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const name = elements.watchlistCreateInput.value.trim();
+  if (!name) {
+    elements.watchlistManagerState.textContent = "請輸入組合名稱。";
+    return;
+  }
+  createWatchlist(name);
+  elements.watchlistCreateInput.value = "";
+  elements.watchlistManagerState.textContent = `已新增「${name}」。`;
+});
+
+elements.watchlistRenameForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const name = elements.watchlistRenameInput.value.trim();
+  if (!name) {
+    elements.watchlistManagerState.textContent = "請輸入新的組合名稱。";
+    return;
+  }
+  renameActiveWatchlist(name);
+  elements.watchlistManagerState.textContent = `已改名為「${name}」。`;
+});
+
+elements.deleteWatchlistButton.addEventListener("click", () => {
+  const active = getActiveWatchlist();
+  if (!active) {
+    return;
+  }
+  if (!window.confirm(`確定要刪除「${active.name}」嗎？`)) {
+    return;
+  }
+  deleteActiveWatchlist();
+});
+
 elements.backToHomeButton.addEventListener("click", () => {
   goHome({ pushHistory: true });
 });
@@ -584,19 +942,24 @@ window.addEventListener("popstate", () => {
 });
 
 async function bootstrap() {
+  loadWatchlists();
+  renderWatchlistPreview();
+  renderWatchlistDrawer();
   await loadSectors();
   await loadAnalysis();
+
   const symbolFromUrl = new URL(window.location.href).searchParams.get("stock");
   if (symbolFromUrl) {
     elements.stockSymbolInput.value = symbolFromUrl;
     await loadStockDetail(symbolFromUrl, { focus: true, pushHistory: false });
     return;
   }
+
   elements.stockSymbolInput.value = "2330";
   loadStockDetail("2330");
 }
 
 bootstrap().catch((error) => {
-  elements.stockList.innerHTML = `<article class="note-card"><h3>載入失敗</h3><p>${error.message}</p></article>`;
+  elements.stockList.innerHTML = `<article class="note-card"><h3>資料載入失敗</h3><p>${error.message}</p></article>`;
   elements.dataSourceBadge.textContent = "資料載入失敗";
 });

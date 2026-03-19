@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>台股趨勢分析平台</title>
+  <title>台股智慧分析平台</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=20260319-1">
+  <link rel="stylesheet" href="./styles.css?v=20260319-3">
 </head>
 <body class="home-mode">
   <div class="bg-orb orb-left"></div>
@@ -17,10 +17,11 @@
     <header class="topbar">
       <div>
         <p class="eyebrow">Taiwan Equity Signals</p>
-        <h1>台股趨勢分析平台</h1>
+        <h1>台股智慧分析平台</h1>
       </div>
       <div class="topbar-meta">
         <span class="badge" id="dataSourceBadge">資料來源載入中</span>
+        <button class="ghost-button" id="watchlistManagerButton" type="button">自選組合</button>
         <button class="ghost-button" id="refreshButton" type="button">重新整理</button>
       </div>
     </header>
@@ -28,8 +29,8 @@
     <section class="hero-card">
       <div class="hero-copy">
         <p class="hero-kicker">Fugle API + 多週期分析</p>
-        <h2>先看產業，再切換短期、中期、長期，快速找出偏多股票與單股技術概況。</h2>
-        <p>你可以先從產業分類查看熱門標的，也可以直接輸入股票代碼，查看這檔股票的價格、MACD、KDJ、成交量與各期間摘要。</p>
+        <h2>先選產業，再切換短中長期，快速查看哪檔台股偏多、原因是什麼、技術面是否持續轉強。</h2>
+        <p>支援產業分類瀏覽、單一股票代碼查詢、日期區間圖表與自選收藏，幫你在同一頁掌握台股觀察重點。</p>
         <form id="stockSearchForm" class="search-bar">
           <input id="stockSymbolInput" type="text" inputmode="numeric" placeholder="輸入 4 位股票代碼，例如 2330">
           <button type="submit">查詢股票</button>
@@ -38,7 +39,7 @@
       <div class="hero-grid">
         <article class="hero-metric">
           <span>目前產業</span>
-          <strong id="activeSectorLabel">載入中</strong>
+          <strong id="activeSectorLabel">資料載入中</strong>
         </article>
         <article class="hero-metric">
           <span>分析週期</span>
@@ -49,8 +50,8 @@
           <strong id="bullishCount">0 檔</strong>
         </article>
         <article class="hero-metric">
-          <span>本期第一名</span>
-          <strong id="topStockLabel">載入中</strong>
+          <span>目前最強</span>
+          <strong id="topStockLabel">資料載入中</strong>
         </article>
       </div>
     </section>
@@ -66,15 +67,26 @@
           <p class="panel-label">分析週期</p>
           <div id="horizonTabs" class="inline-tabs"></div>
         </section>
+
+        <section class="sidebar-watchlist-card">
+          <div class="section-head section-head-compact">
+            <div>
+              <p class="panel-label">自選組合</p>
+              <h3 id="activeWatchlistName">我的自選</h3>
+            </div>
+            <button class="ghost-button small-button" id="watchlistQuickOpenButton" type="button">管理</button>
+          </div>
+          <div id="watchlistPreview" class="watchlist-preview"></div>
+        </section>
       </aside>
 
       <section class="content-card">
         <div class="section-head">
           <div>
             <p class="panel-label">產業排行</p>
-            <h2 id="resultTitle">分類分析結果</h2>
+            <h2 id="resultTitle">分析結果</h2>
           </div>
-          <p class="muted" id="generatedAtLabel">載入中</p>
+          <p class="muted" id="generatedAtLabel">資料載入中</p>
         </div>
         <div id="stockList" class="stock-list"></div>
       </section>
@@ -83,10 +95,11 @@
     <section class="detail-card" id="detailCard">
       <div class="section-head">
         <div>
-          <p class="panel-label">單股詳情</p>
-          <h2 id="detailTitle">輸入股票代碼後查看單股分析</h2>
+          <p class="panel-label">單股分析</p>
+          <h2 id="detailTitle">輸入股票代碼查看詳細資訊</h2>
         </div>
         <div class="detail-head-actions">
+          <button id="detailFavoriteButton" class="favorite-button favorite-button-large" type="button" aria-label="收藏這檔股票">♡</button>
           <p class="muted" id="detailDateLabel">等待查詢</p>
           <button id="backToHomeButton" class="ghost-button detail-back-button" type="button" hidden>返回首頁</button>
         </div>
@@ -97,7 +110,7 @@
           <div class="detail-price-row">
             <div>
               <p class="stock-code" id="detailSymbol">-</p>
-              <h3 class="stock-name" id="detailName">請輸入股票代碼</h3>
+              <h3 class="stock-name" id="detailName">請先輸入股票代碼</h3>
             </div>
             <div class="stock-score">
               <strong class="score-value" id="detailClosePrice">-</strong>
@@ -110,9 +123,14 @@
         </article>
 
         <article class="detail-indicators">
-          <h3>技術指標摘要</h3>
-          <div id="indicatorSnapshot" class="indicator-snapshot"></div>
-          <div id="windowTable" class="window-table"></div>
+          <div class="detail-indicator-head">
+            <div>
+              <h3>技術圖表</h3>
+              <p class="muted">切換區間後，圖表與指標摘要會同步更新。</p>
+            </div>
+            <div id="detailRangeTabs" class="range-tabs"></div>
+          </div>
+          <div id="indicatorSnapshot" class="compact-indicator-panel"></div>
         </article>
       </div>
 
@@ -129,7 +147,7 @@
 
       <div class="detail-grid detail-grid-bottom">
         <article class="detail-summary">
-          <h3>近 60 筆價格與成交量</h3>
+          <h3>價格與成交量</h3>
           <div id="priceChart" class="chart-box"></div>
         </article>
         <article class="detail-summary">
@@ -142,6 +160,55 @@
     </section>
   </div>
 
+  <section id="watchlistDrawer" class="watchlist-drawer" hidden>
+    <div class="watchlist-drawer-backdrop" data-close-watchlist="true"></div>
+    <div class="watchlist-drawer-panel">
+      <div class="section-head">
+        <div>
+          <p class="panel-label">收藏管理</p>
+          <h2>自選組合</h2>
+        </div>
+        <button class="ghost-button" id="closeWatchlistDrawerButton" type="button">關閉</button>
+      </div>
+
+      <div class="watchlist-manager-grid">
+        <section class="watchlist-manager-card">
+          <h3>組合列表</h3>
+          <div id="watchlistTabs" class="watchlist-tabs"></div>
+
+          <form id="watchlistCreateForm" class="watchlist-form">
+            <label for="watchlistCreateInput">新增自選組合</label>
+            <div class="watchlist-form-row">
+              <input id="watchlistCreateInput" type="text" maxlength="30" placeholder="例如 AI 觀察名單">
+              <button type="submit">新增</button>
+            </div>
+          </form>
+
+          <form id="watchlistRenameForm" class="watchlist-form">
+            <label for="watchlistRenameInput">修改目前組合名稱</label>
+            <div class="watchlist-form-row">
+              <input id="watchlistRenameInput" type="text" maxlength="30" placeholder="修改自選組合名稱">
+              <button type="submit">改名</button>
+            </div>
+          </form>
+
+          <button id="deleteWatchlistButton" class="danger-button" type="button">刪除目前組合</button>
+        </section>
+
+        <section class="watchlist-manager-card">
+          <div class="section-head section-head-compact">
+            <div>
+              <h3 id="watchlistDrawerTitle">我的自選</h3>
+              <p class="muted" id="watchlistDrawerMeta">0 檔股票</p>
+            </div>
+          </div>
+          <div id="watchlistItems" class="watchlist-items"></div>
+          <p class="muted" id="watchlistManagerState"></p>
+        </section>
+      </div>
+    </div>
+  </section>
+
   <template id="stockCardTemplate">
     <article class="stock-card">
       <div class="stock-card-head">
@@ -149,9 +216,12 @@
           <p class="stock-code"></p>
           <h3 class="stock-name"></h3>
         </div>
-        <div class="stock-score">
-          <strong class="score-value"></strong>
-          <p class="star-rating"></p>
+        <div class="stock-card-actions">
+          <button class="favorite-button card-favorite-button" type="button" aria-label="收藏這檔股票">♡</button>
+          <div class="stock-score">
+            <strong class="score-value"></strong>
+            <p class="star-rating"></p>
+          </div>
         </div>
       </div>
 
@@ -173,6 +243,6 @@
     </article>
   </template>
 
-  <script src="./app.js?v=20260319-1"></script>
+  <script src="./app.js?v=20260319-3"></script>
 </body>
 </html>

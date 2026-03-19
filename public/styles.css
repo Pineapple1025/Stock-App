@@ -22,6 +22,10 @@ body {
   background: linear-gradient(180deg, #f7fbff 0%, var(--bg) 100%);
 }
 
+body.watchlist-open {
+  overflow: hidden;
+}
+
 .bg-orb {
   position: fixed;
   width: 420px;
@@ -104,6 +108,7 @@ h1 {
   display: flex;
   gap: 12px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .badge,
@@ -129,6 +134,10 @@ h1 {
   color: var(--text);
   padding: 10px 16px;
   cursor: pointer;
+}
+
+.small-button {
+  padding: 8px 12px;
 }
 
 .hero-card {
@@ -264,6 +273,40 @@ h1 {
   padding: 11px 16px;
 }
 
+.sidebar-watchlist-card {
+  border-top: 1px solid rgba(16, 24, 40, 0.06);
+  padding-top: 6px;
+}
+
+.section-head-compact {
+  margin-bottom: 12px;
+}
+
+.watchlist-preview {
+  display: grid;
+  gap: 10px;
+}
+
+.watchlist-preview-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 16px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.watchlist-preview-item strong,
+.watchlist-preview-item span {
+  display: block;
+}
+
+.watchlist-preview-item span {
+  color: var(--muted);
+  margin-top: 4px;
+}
+
 .note-card {
   padding: 14px 15px;
   border-radius: 18px;
@@ -289,6 +332,71 @@ h1 {
   background: linear-gradient(180deg, rgba(248, 251, 255, 0.95), rgba(240, 246, 252, 0.86));
   border: 1px solid rgba(16, 24, 40, 0.06);
   padding: 12px;
+}
+
+.detail-indicator-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.detail-indicator-head p {
+  margin: 8px 0 0;
+}
+
+.range-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.range-tab {
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 9px 13px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.range-tab.active {
+  color: white;
+  background: linear-gradient(135deg, var(--teal), var(--blue));
+  border-color: transparent;
+}
+
+.compact-indicator-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.compact-indicator-card {
+  border-radius: 16px;
+  background: rgba(243, 247, 251, 0.92);
+  border: 1px solid rgba(16, 24, 40, 0.06);
+  padding: 12px 14px;
+}
+
+.compact-indicator-card span,
+.compact-indicator-card small {
+  display: block;
+}
+
+.compact-indicator-card span,
+.compact-indicator-card small {
+  color: var(--muted);
+}
+
+.compact-indicator-card strong {
+  display: block;
+  margin: 6px 0 4px;
+  font-size: 1.08rem;
 }
 
 .chart-insights {
@@ -363,6 +471,10 @@ h1 {
   background: #7a445f;
 }
 
+.legend-j {
+  background: #6b8f00;
+}
+
 .chart-svg-wrap {
   display: grid;
   grid-template-columns: 56px 1fr;
@@ -398,6 +510,31 @@ h1 {
   gap: 12px;
 }
 
+.favorite-button {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 106, 31, 0.18);
+  background: white;
+  color: #c46834;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.favorite-button.is-active {
+  color: white;
+  background: linear-gradient(135deg, #f08a4b, #d4566f);
+  border-color: transparent;
+}
+
+.favorite-button-large {
+  width: 48px;
+  height: 48px;
+  font-size: 1.35rem;
+}
+
 .detail-back-button {
   white-space: nowrap;
 }
@@ -425,6 +562,16 @@ h1 {
   justify-content: space-between;
   gap: 12px;
   align-items: center;
+}
+
+.stock-card-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.card-favorite-button {
+  align-self: flex-start;
 }
 
 .stock-name {
@@ -572,10 +719,153 @@ h1 {
   gap: 10px;
 }
 
+.watchlist-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+
+.watchlist-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(19, 32, 51, 0.42);
+  backdrop-filter: blur(6px);
+}
+
+.watchlist-drawer-panel {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  bottom: 18px;
+  width: min(760px, calc(100% - 24px));
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  overflow: auto;
+}
+
+.watchlist-manager-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 18px;
+}
+
+.watchlist-manager-card {
+  border-radius: 20px;
+  background: rgba(247, 250, 254, 0.92);
+  border: 1px solid rgba(16, 24, 40, 0.06);
+  padding: 18px;
+}
+
+.watchlist-tabs,
+.watchlist-items {
+  display: grid;
+  gap: 10px;
+}
+
+.watchlist-tab {
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  border-radius: 14px;
+  background: white;
+  padding: 12px 14px;
+  text-align: left;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.watchlist-tab.active {
+  color: white;
+  background: linear-gradient(135deg, var(--teal), var(--blue));
+  border-color: transparent;
+}
+
+.watchlist-form {
+  margin-top: 16px;
+}
+
+.watchlist-form label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.watchlist-form-row {
+  display: flex;
+  gap: 10px;
+}
+
+.watchlist-form-row input {
+  flex: 1;
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font: inherit;
+}
+
+.watchlist-form-row button,
+.danger-button {
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.watchlist-form-row button {
+  background: linear-gradient(135deg, var(--teal), var(--blue));
+  color: white;
+}
+
+.danger-button {
+  width: 100%;
+  margin-top: 16px;
+  background: rgba(212, 86, 111, 0.12);
+  color: #b33757;
+}
+
+.danger-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.watchlist-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  border-radius: 16px;
+  background: white;
+  padding: 12px;
+}
+
+.watchlist-item-main {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.watchlist-item-main strong,
+.watchlist-item-main span {
+  display: block;
+}
+
+.watchlist-item-main span {
+  color: var(--muted);
+  margin-top: 4px;
+}
+
 @media (max-width: 1024px) {
   .hero-card,
   .layout,
-  .detail-grid {
+  .detail-grid,
+  .watchlist-manager-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -590,7 +880,8 @@ h1 {
   .section-head,
   .stock-card-head,
   .detail-price-row,
-  .search-bar {
+  .search-bar,
+  .watchlist-form-row {
     flex-direction: column;
     align-items: stretch;
   }
@@ -599,8 +890,21 @@ h1 {
   .content-columns,
   .window-row,
   .horizon-score-grid,
-  .chart-insights {
+  .chart-insights,
+  .compact-indicator-panel {
     grid-template-columns: 1fr;
+  }
+
+  .detail-indicator-head {
+    flex-direction: column;
+  }
+
+  .range-tabs {
+    justify-content: flex-start;
+  }
+
+  .stock-card-actions {
+    justify-content: space-between;
   }
 
   .score-value {
@@ -619,6 +923,15 @@ h1 {
   .chart-caption {
     margin-left: 0;
     width: 100%;
+  }
+
+  .watchlist-drawer-panel {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    bottom: 10px;
+    width: auto;
+    padding: 18px;
   }
 }
 
