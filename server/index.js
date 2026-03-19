@@ -3,7 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const { port, publicDir } = require("./config");
-const { getSectors, getSectorAnalysis, getStockDetail } = require("./services/sectorService");
+const { getSectors, getSectorAnalysis, getStockDetail, searchStocks } = require("./services/sectorService");
 
 const app = express();
 
@@ -54,6 +54,23 @@ app.get("/api/stock/:symbol", async (request, response) => {
   } catch (error) {
     response.status(error.status || 500).json({
       error: "STOCK_DETAIL_FAILED",
+      message: error.message,
+      detail: error.detail || null
+    });
+  }
+});
+
+app.get("/api/search", async (request, response) => {
+  try {
+    const q = request.query.q || "";
+    const horizon = request.query.horizon || "short";
+    const limit = request.query.limit || 8;
+    response.json({
+      items: await searchStocks(q, horizon, limit)
+    });
+  } catch (error) {
+    response.status(error.status || 500).json({
+      error: "SEARCH_FAILED",
       message: error.message,
       detail: error.detail || null
     });

@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>台股訊號研究室</title>
   <meta name="description" content="台股多週期分析平台，整合產業分類、短中長期評分、單股技術圖表與自選收藏。">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css?v=20260319-editorial-1">
 </head>
 <body class="home-mode">
@@ -19,7 +16,7 @@
     <header class="topbar">
       <div class="brand-block reveal-up">
         <p class="eyebrow">Taiwan Equity Research Desk</p>
-        <h1>台股訊號研究室</h1>
+        <h1>台股趨勢 我來辨識</h1>
       </div>
 
       <nav class="topbar-nav reveal-up" aria-label="主要功能">
@@ -39,7 +36,6 @@
     <section class="hero-card" id="heroSection">
       <div class="hero-copy hero-copy-welcome reveal-up">
         <p class="hero-kicker">Welcome back</p>
-        <h2>從產業脈動到單一股票，<br>把判讀留給更清楚的畫面。</h2>
         <p class="hero-description">
           先搜尋代碼，或從下方產業排行切入。
           你會看到短期、中期、長期的強弱評分，以及價格、MACD、KD 的分開圖表。
@@ -48,6 +44,7 @@
           <input id="stockSymbolInput" type="text" inputmode="numeric" placeholder="輸入 4 位股票代碼，例如 2330">
           <button type="submit">查詢股票</button>
         </form>
+        <div id="searchSuggestions" class="search-suggestions" hidden></div>
       </div>
 
       <div class="hero-grid reveal-up">

@@ -25,7 +25,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: "DM Sans", "Noto Sans TC", sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--text);
   background:
     radial-gradient(circle at top left, rgba(32, 75, 66, 0.08), transparent 30%),
@@ -148,8 +148,8 @@ h3,
 .score-value,
 .hero-metric strong {
   margin: 0;
-  font-family: "Cormorant Garamond", "Noto Serif TC", serif;
-  letter-spacing: -0.03em;
+  font-family: inherit;
+  letter-spacing: -0.02em;
 }
 
 h1 {
@@ -276,6 +276,98 @@ h3 {
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
+.search-suggestions {
+  margin-top: 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(31, 31, 31, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 40px rgba(35, 30, 25, 0.08);
+  overflow: hidden;
+}
+
+.search-suggestion-item {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid rgba(31, 31, 31, 0.06);
+  background: transparent;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.search-suggestion-item:first-child {
+  border-top: 0;
+}
+
+.search-suggestion-item:hover,
+.search-suggestion-item.is-active {
+  background: rgba(20, 58, 82, 0.06);
+}
+
+.search-suggestion-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.search-suggestion-title {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.search-suggestion-symbol {
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+}
+
+.search-suggestion-name {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.search-suggestion-meta {
+  margin-top: 6px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.search-suggestion-stars {
+  color: var(--clay);
+  white-space: nowrap;
+}
+
+.search-suggestion-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.search-mini-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(20, 58, 82, 0.08);
+  color: var(--navy);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.search-mini-badge.is-favorite {
+  background: rgba(201, 106, 55, 0.12);
+  color: var(--clay);
+}
+
 .hero-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -365,9 +457,10 @@ h3 {
 .inline-tab.active,
 .range-tab.active,
 .watchlist-tab.active {
-  color: white;
-  background: linear-gradient(135deg, var(--forest), var(--navy));
-  border-color: transparent;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(20, 58, 82, 0.24);
+  box-shadow: inset 0 0 0 1px rgba(20, 58, 82, 0.08);
 }
 
 .inline-tabs {

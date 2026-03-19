@@ -9,6 +9,54 @@ const {
   getFallbackStockSectorsSafe
 } = require("./stockUniverseService");
 
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function scoreSearchMatch(query, stock) {
+  const normalizedQuery = String(query || "").trim().toLowerCase();
+  const symbol = String(stock.symbol || "").toLowerCase();
+  const name = String(stock.name || "").toLowerCase();
+  const industry = String(stock.industry || "").toLowerCase();
+
+  if (!normalizedQuery) {
+    return -1;
+  }
+
+  if (symbol === normalizedQuery) {
+    return 100;
+  }
+
+  if (name === normalizedQuery) {
+    return 95;
+  }
+
+  if (symbol.startsWith(normalizedQuery)) {
+    return 88;
+  }
+
+  if (name.startsWith(normalizedQuery)) {
+    return 84;
+  }
+
+  if (name.includes(normalizedQuery)) {
+    return 72;
+  }
+
+  if (industry.includes(normalizedQuery)) {
+    return 50;
+  }
+
+  if (/^\d+$/.test(normalizedQuery)) {
+    const fuzzySymbol = symbol.match(new RegExp(escapeRegExp(normalizedQuery)));
+    if (fuzzySymbol) {
+      return 40;
+    }
+  }
+
+  return -1;
+}
+
 function lastRow(rows) {
   return rows && rows.length ? rows[rows.length - 1] : null;
 }
@@ -312,8 +360,50 @@ async function getStockDetail(symbolInput) {
   };
 }
 
+async function searchStocks(queryInput, horizon = "short", limit = 8) {
+  const query = String(queryInput || "").trim();
+  if (!query) {
+    return [];
+  }
+
+  const universe = await getUniverse();
+  const ranked = Object.values(universe.stocks)
+    .map((stock) => ({
+      stock,
+      rank: scoreSearchMatch(query, stock)
+    }))
+    .filter((item) => item.rank >= 0)
+    .sort((left, right) => {
+      if (right.rank !== left.rank) {
+        return right.rank - left.rank;
+      }
+      return String(left.stock.symbol).localeCompare(String(right.stock.symbol), "zh-Hant");
+    })
+    .slice(0, Math.max(1, Math.min(Number(limit) || 8, 12)));
+
+  const items = await Promise.all(ranked.map(async ({ stock }) => {
+    const metrics = await buildMetrics(stock.symbol);
+    const analysis = analyzeByHorizon(metrics, horizon);
+    const sectors = await getStockSectors(stock.symbol);
+
+    return {
+      symbol: stock.symbol,
+      name: stock.name || stock.symbol,
+      market: stock.market || null,
+      industry: stock.industry || null,
+      stars: analysis.stars,
+      score: analysis.score,
+      biasLabel: analysis.biasLabel,
+      sectors: sectors.slice(0, 3)
+    };
+  }));
+
+  return items;
+}
+
 module.exports = {
   getSectors,
   getSectorAnalysis,
-  getStockDetail
+  getStockDetail,
+  searchStocks
 };

@@ -32,7 +32,11 @@ const state = {
   detailRange: "1m",
   detail: null,
   watchlists: [],
-  activeWatchlistId: DEFAULT_WATCHLISTS[0].id
+  activeWatchlistId: DEFAULT_WATCHLISTS[0].id,
+  searchSuggestions: [],
+  searchActiveIndex: -1,
+  searchSelectedSymbol: "",
+  searchDebounceId: null
 };
 
 const elements = {
@@ -54,6 +58,7 @@ const elements = {
   template: document.querySelector("#stockCardTemplate"),
   stockSearchForm: document.querySelector("#stockSearchForm"),
   stockSymbolInput: document.querySelector("#stockSymbolInput"),
+  searchSuggestions: document.querySelector("#searchSuggestions"),
   detailTitle: document.querySelector("#detailTitle"),
   detailDateLabel: document.querySelector("#detailDateLabel"),
   detailSymbol: document.querySelector("#detailSymbol"),
@@ -108,6 +113,16 @@ function average(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function escapeHtml(value) {
+  return String(value || "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[char]));
+}
+
 async function fetchJson(url) {
   const requestUrl = url.includes("?") ? `${url}&_ts=${Date.now()}` : `${url}?_ts=${Date.now()}`;
   const response = await fetch(requestUrl, { cache: "no-store" });
@@ -155,6 +170,81 @@ function appendListItems(container, items, fallbackText) {
     item.textContent = text;
     container.appendChild(item);
   });
+}
+
+function clearSearchSuggestions(options = {}) {
+  state.searchSuggestions = [];
+  state.searchActiveIndex = -1;
+  if (!options.preserveSelection) {
+    state.searchSelectedSymbol = "";
+  }
+  elements.searchSuggestions.hidden = true;
+  elements.searchSuggestions.innerHTML = "";
+}
+
+function applySearchSuggestion(item) {
+  elements.stockSymbolInput.value = item.name;
+  state.searchSelectedSymbol = item.symbol;
+  clearSearchSuggestions({ preserveSelection: true });
+}
+
+function renderSearchSuggestions(items) {
+  state.searchSuggestions = items;
+  if (!items.length) {
+    state.searchActiveIndex = -1;
+  } else if (state.searchActiveIndex < 0) {
+    state.searchActiveIndex = 0;
+  } else if (state.searchActiveIndex >= items.length) {
+    state.searchActiveIndex = items.length - 1;
+  }
+  elements.searchSuggestions.hidden = items.length === 0;
+
+  if (!items.length) {
+    elements.searchSuggestions.innerHTML = "";
+    return;
+  }
+
+  elements.searchSuggestions.innerHTML = items.map((item, index) => {
+    const favorite = isStockInActiveWatchlist(item.symbol);
+    const sectors = Array.isArray(item.sectors) ? item.sectors.map((sector) => sector.label).join(" / ") : "";
+    return `
+      <button class="search-suggestion-item${index === state.searchActiveIndex ? " is-active" : ""}" type="button" data-suggestion-index="${index}">
+        <div class="search-suggestion-main">
+          <div>
+            <div class="search-suggestion-title">
+              <span class="search-suggestion-symbol">${escapeHtml(item.symbol)}</span>
+              <span class="search-suggestion-name">${escapeHtml(item.name)}</span>
+            </div>
+            <div class="search-suggestion-meta">
+              <span class="search-suggestion-stars">${stars(item.stars)}</span>
+              <span>${escapeHtml(item.biasLabel || "")}</span>
+              ${item.industry ? `<span>${escapeHtml(item.industry)}</span>` : ""}
+              ${sectors ? `<span>${escapeHtml(sectors)}</span>` : ""}
+            </div>
+          </div>
+          <div class="search-suggestion-badges">
+            <span class="search-mini-badge">${formatNumber(item.score, 0)} 分</span>
+            ${favorite ? '<span class="search-mini-badge is-favorite">已收藏</span>' : ""}
+          </div>
+        </div>
+      </button>
+    `;
+  }).join("");
+}
+
+async function loadSearchSuggestions(query) {
+  const trimmed = String(query || "").trim();
+  if (!trimmed) {
+    clearSearchSuggestions();
+    return;
+  }
+
+  try {
+    const result = await fetchJson(`/api/search?q=${encodeURIComponent(trimmed)}&horizon=${state.horizon}&limit=8`);
+    renderSearchSuggestions(result.items || []);
+  } catch {
+    clearSearchSuggestions();
+  }
 }
 
 function loadWatchlists() {
@@ -345,6 +435,9 @@ function syncFavoriteButtons() {
   } else {
     elements.detailFavoriteButton.classList.remove("is-active");
     elements.detailFavoriteButton.textContent = "♡";
+  }
+  if (state.searchSuggestions.length) {
+    renderSearchSuggestions(state.searchSuggestions);
   }
 }
 
@@ -845,12 +938,68 @@ elements.backToHomeButton.addEventListener("click", () => goHome({ pushHistory: 
 
 elements.stockSearchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const symbol = elements.stockSymbolInput.value.trim();
+  const symbol = state.searchSelectedSymbol || elements.stockSymbolInput.value.trim();
   if (!symbol) {
-    renderDetailError("請輸入 4 位股票代碼。");
+    renderDetailError("請輸入股票代碼或股票名稱。");
     return;
   }
+  clearSearchSuggestions();
   await loadStockDetail(symbol, { focus: true, pushHistory: true });
+});
+
+elements.stockSymbolInput.addEventListener("input", () => {
+  state.searchSelectedSymbol = "";
+  clearTimeout(state.searchDebounceId);
+  const query = elements.stockSymbolInput.value.trim();
+  if (!query) {
+    clearSearchSuggestions();
+    return;
+  }
+  state.searchDebounceId = window.setTimeout(() => {
+    loadSearchSuggestions(query);
+  }, 180);
+});
+
+elements.stockSymbolInput.addEventListener("keydown", (event) => {
+  if (!state.searchSuggestions.length) {
+    return;
+  }
+
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    state.searchActiveIndex = (state.searchActiveIndex + 1) % state.searchSuggestions.length;
+    renderSearchSuggestions(state.searchSuggestions);
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    state.searchActiveIndex = (state.searchActiveIndex - 1 + state.searchSuggestions.length) % state.searchSuggestions.length;
+    renderSearchSuggestions(state.searchSuggestions);
+  } else if (event.key === "Enter" && state.searchActiveIndex >= 0) {
+    event.preventDefault();
+    const item = state.searchSuggestions[state.searchActiveIndex];
+    applySearchSuggestion(item);
+    loadStockDetail(item.symbol, { focus: true, pushHistory: true });
+  } else if (event.key === "Escape") {
+    clearSearchSuggestions();
+  }
+});
+
+elements.stockSymbolInput.addEventListener("blur", () => {
+  window.setTimeout(() => {
+    clearSearchSuggestions();
+  }, 120);
+});
+
+elements.searchSuggestions.addEventListener("click", (event) => {
+  const target = event.target.closest("[data-suggestion-index]");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const item = state.searchSuggestions[Number(target.dataset.suggestionIndex)];
+  if (!item) {
+    return;
+  }
+  applySearchSuggestion(item);
+  loadStockDetail(item.symbol, { focus: true, pushHistory: true });
 });
 
 window.addEventListener("popstate", () => {
