@@ -114,7 +114,7 @@ async function getStockDetail(symbolInput) {
     fugleClient.getQuote(symbol)
       .then((value) => ({ ok: true, value, error: null }))
       .catch((error) => ({ ok: false, value: null, error })),
-    fugleClient.getHistoricalCandles(symbol, { daysBack: 370 })
+    fugleClient.getHistoricalCandles(symbol, { daysBack: 360 })
       .then((value) => ({ ok: true, value, error: null }))
       .catch((error) => ({ ok: false, value: null, error })),
     fugleClient.getMACD(symbol, { daysBack: 200 })
