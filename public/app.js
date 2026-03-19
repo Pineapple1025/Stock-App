@@ -50,8 +50,11 @@ const elements = {
   detailRiskReasons: document.querySelector("#detailRiskReasons"),
   priceChart: document.querySelector("#priceChart"),
   indicatorChart: document.querySelector("#indicatorChart"),
-  detailState: document.querySelector("#detailState")
+  detailState: document.querySelector("#detailState"),
+  debugPayload: document.querySelector("#debugPayload")
 };
+
+const BUILD_VERSION = "20260319-debug-1";
 
 async function fetchJson(url) {
   const requestUrl = url.includes("?")
@@ -82,6 +85,13 @@ function formatNumber(value) {
 
 function setDetailState(message) {
   elements.detailState.textContent = message || "";
+}
+
+function renderDebugPayload(payload) {
+  if (!elements.debugPayload) {
+    return;
+  }
+  elements.debugPayload.textContent = JSON.stringify(payload, null, 2);
 }
 
 function appendListItems(container, items, fallbackText) {
@@ -371,6 +381,17 @@ function renderDetail(detail) {
   renderPriceChart(detail);
   renderIndicatorChart(detail);
   setDetailState(`單股資料來源 ${detail.profile.universeSource}`);
+  renderDebugPayload({
+    buildVersion: BUILD_VERSION,
+    symbol: detail.symbol,
+    latestIndicators: detail.latestIndicators,
+    window1d: detail.windows["1d"],
+    seriesLength: {
+      candles: detail.series.candles.length,
+      macd: detail.series.macd.length,
+      kdj: detail.series.kdj.length
+    }
+  });
 }
 
 function renderDetailError(message) {
@@ -390,11 +411,19 @@ function renderDetailError(message) {
   elements.priceChart.innerHTML = "<p>目前沒有圖表資料。</p>";
   elements.indicatorChart.innerHTML = "<p>目前沒有圖表資料。</p>";
   setDetailState(message);
+  renderDebugPayload({
+    buildVersion: BUILD_VERSION,
+    error: message
+  });
 }
 
 function renderDetailLoading(symbol) {
   elements.detailTitle.textContent = `正在載入 ${symbol}`;
   setDetailState("正在取得單股資料與技術指標...");
+  renderDebugPayload({
+    buildVersion: BUILD_VERSION,
+    loading: symbol
+  });
 }
 
 async function loadSectors() {
