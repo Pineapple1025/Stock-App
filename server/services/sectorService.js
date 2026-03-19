@@ -111,12 +111,31 @@ async function getStockDetail(symbolInput) {
   const stockMeta = await getStock(symbol);
   const metrics = await buildMetrics(symbol);
   const [quoteResult, candlesResult, macdResult, kdjResult, universe] = await Promise.all([
-    fugleClient.getQuote(symbol).then((value) => ({ ok: true, value })).catch(() => ({ ok: false, value: null })),
-    fugleClient.getHistoricalCandles(symbol, { daysBack: 370 }).then((value) => ({ ok: true, value })).catch(() => ({ ok: false, value: null })),
-    fugleClient.getMACD(symbol, { daysBack: 200 }).then((value) => ({ ok: true, value })).catch(() => ({ ok: false, value: null })),
-    fugleClient.getKDJ(symbol, { daysBack: 200 }).then((value) => ({ ok: true, value })).catch(() => ({ ok: false, value: null })),
+    fugleClient.getQuote(symbol)
+      .then((value) => ({ ok: true, value, error: null }))
+      .catch((error) => ({ ok: false, value: null, error })),
+    fugleClient.getHistoricalCandles(symbol, { daysBack: 370 })
+      .then((value) => ({ ok: true, value, error: null }))
+      .catch((error) => ({ ok: false, value: null, error })),
+    fugleClient.getMACD(symbol, { daysBack: 200 })
+      .then((value) => ({ ok: true, value, error: null }))
+      .catch((error) => ({ ok: false, value: null, error })),
+    fugleClient.getKDJ(symbol, { daysBack: 200 })
+      .then((value) => ({ ok: true, value, error: null }))
+      .catch((error) => ({ ok: false, value: null, error })),
     getUniverse()
   ]);
+
+  const fugleErrors = [quoteResult, candlesResult, macdResult, kdjResult]
+    .map((result) => result.error)
+    .filter(Boolean);
+
+  if (fugleErrors.length && fugleErrors.every((error) => error.code === "MISSING_FUGLE_API_KEY")) {
+    const error = new Error("Vercel 尚未設定 FUGLE_API_KEY，請到 Project Settings > Environment Variables 補上後重新部署。");
+    error.status = 503;
+    error.code = "MISSING_FUGLE_API_KEY";
+    throw error;
+  }
 
   const quote = quoteResult.value;
   const candles = candlesResult.value;
@@ -133,6 +152,14 @@ async function getStockDetail(symbolInput) {
   if (!stockMeta && !quote && candleRows.length === 0) {
     const error = new Error("Stock symbol not found");
     error.status = 404;
+    throw error;
+  }
+
+  if (!quote && candleRows.length === 0 && macdRows.length === 0 && kdjRows.length === 0) {
+    const firstError = fugleErrors[0];
+    const error = new Error(firstError?.message || "目前無法取得這支股票的即時與技術指標資料。");
+    error.status = firstError?.status || 503;
+    error.detail = firstError?.detail || null;
     throw error;
   }
 

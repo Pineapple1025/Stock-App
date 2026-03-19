@@ -13,7 +13,10 @@ function buildUrl(path, query = {}) {
 
 async function request(path, query) {
   if (!fugleApiKey) {
-    return null;
+    const error = new Error("Missing FUGLE_API_KEY environment variable");
+    error.status = 503;
+    error.code = "MISSING_FUGLE_API_KEY";
+    throw error;
   }
 
   const response = await fetchClient(buildUrl(path, query), {
