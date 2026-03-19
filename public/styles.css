@@ -165,6 +165,15 @@ h1 {
   max-width: 58ch;
 }
 
+.hero-copy-welcome {
+  display: grid;
+  align-content: center;
+}
+
+.hero-copy-welcome h2 {
+  margin: 0 0 16px;
+}
+
 .search-bar {
   display: flex;
   gap: 10px;
@@ -757,6 +766,7 @@ h1 {
   background: rgba(247, 250, 254, 0.92);
   border: 1px solid rgba(16, 24, 40, 0.06);
   padding: 18px;
+  overflow: hidden;
 }
 
 .watchlist-tabs,
@@ -780,6 +790,14 @@ h1 {
   color: white;
   background: linear-gradient(135deg, var(--teal), var(--blue));
   border-color: transparent;
+}
+
+.watchlist-list-head {
+  align-items: flex-start;
+}
+
+.watchlist-drawer-actions {
+  margin-top: 16px;
 }
 
 .watchlist-form {

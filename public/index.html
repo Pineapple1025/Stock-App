@@ -27,10 +27,8 @@
     </header>
 
     <section class="hero-card">
-      <div class="hero-copy">
-        <p class="hero-kicker">Fugle API + 多週期分析</p>
-        <h2>先選產業，再切換短中長期，快速查看哪檔台股偏多、原因是什麼、技術面是否持續轉強。</h2>
-        <p>支援產業分類瀏覽、單一股票代碼查詢、日期區間圖表與自選收藏，幫你在同一頁掌握台股觀察重點。</p>
+      <div class="hero-copy hero-copy-welcome">
+        <h2>歡迎回來</h2>
         <form id="stockSearchForm" class="search-bar">
           <input id="stockSymbolInput" type="text" inputmode="numeric" placeholder="輸入 4 位股票代碼，例如 2330">
           <button type="submit">查詢股票</button>
@@ -173,26 +171,14 @@
 
       <div class="watchlist-manager-grid">
         <section class="watchlist-manager-card">
-          <h3>組合列表</h3>
+          <div class="section-head section-head-compact watchlist-list-head">
+            <div>
+              <h3>組合列表</h3>
+              <p class="muted">預設提供三個自選組合，也可以再新增。</p>
+            </div>
+            <button id="addWatchlistButton" class="ghost-button small-button" type="button">新增自選</button>
+          </div>
           <div id="watchlistTabs" class="watchlist-tabs"></div>
-
-          <form id="watchlistCreateForm" class="watchlist-form">
-            <label for="watchlistCreateInput">新增自選組合</label>
-            <div class="watchlist-form-row">
-              <input id="watchlistCreateInput" type="text" maxlength="30" placeholder="例如 AI 觀察名單">
-              <button type="submit">新增</button>
-            </div>
-          </form>
-
-          <form id="watchlistRenameForm" class="watchlist-form">
-            <label for="watchlistRenameInput">修改目前組合名稱</label>
-            <div class="watchlist-form-row">
-              <input id="watchlistRenameInput" type="text" maxlength="30" placeholder="修改自選組合名稱">
-              <button type="submit">改名</button>
-            </div>
-          </form>
-
-          <button id="deleteWatchlistButton" class="danger-button" type="button">刪除目前組合</button>
         </section>
 
         <section class="watchlist-manager-card">
@@ -201,8 +187,12 @@
               <h3 id="watchlistDrawerTitle">我的自選</h3>
               <p class="muted" id="watchlistDrawerMeta">0 檔股票</p>
             </div>
+            <button id="renameWatchlistButton" class="ghost-button small-button" type="button">更改名稱</button>
           </div>
           <div id="watchlistItems" class="watchlist-items"></div>
+          <div class="watchlist-drawer-actions">
+            <button id="deleteWatchlistButton" class="danger-button" type="button">刪除目前組合</button>
+          </div>
           <p class="muted" id="watchlistManagerState"></p>
         </section>
       </div>

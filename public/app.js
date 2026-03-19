@@ -17,11 +17,11 @@ const RANGE_OPTIONS = [
   { key: "1y", label: "一年", count: 264 }
 ];
 
-const DEFAULT_WATCHLIST = {
-  id: "default",
-  name: "我的自選",
-  stocks: []
-};
+const DEFAULT_WATCHLISTS = [
+  { id: "default-1", name: "自選1", stocks: [] },
+  { id: "default-2", name: "自選2", stocks: [] },
+  { id: "default-3", name: "自選3", stocks: [] }
+];
 
 const state = {
   sectors: [],
@@ -32,7 +32,7 @@ const state = {
   detailRange: "1m",
   detail: null,
   watchlists: [],
-  activeWatchlistId: DEFAULT_WATCHLIST.id,
+  activeWatchlistId: DEFAULT_WATCHLISTS[0].id,
   watchlistDrawerOpen: false
 };
 
@@ -81,10 +81,8 @@ const elements = {
   watchlistDrawerTitle: document.querySelector("#watchlistDrawerTitle"),
   watchlistDrawerMeta: document.querySelector("#watchlistDrawerMeta"),
   watchlistManagerState: document.querySelector("#watchlistManagerState"),
-  watchlistCreateForm: document.querySelector("#watchlistCreateForm"),
-  watchlistCreateInput: document.querySelector("#watchlistCreateInput"),
-  watchlistRenameForm: document.querySelector("#watchlistRenameForm"),
-  watchlistRenameInput: document.querySelector("#watchlistRenameInput"),
+  addWatchlistButton: document.querySelector("#addWatchlistButton"),
+  renameWatchlistButton: document.querySelector("#renameWatchlistButton"),
   deleteWatchlistButton: document.querySelector("#deleteWatchlistButton")
 };
 
@@ -96,13 +94,13 @@ function loadWatchlists() {
   try {
     const raw = localStorage.getItem(WATCHLIST_STORAGE_KEY);
     if (!raw) {
-      state.watchlists = [{ ...DEFAULT_WATCHLIST }];
+      state.watchlists = DEFAULT_WATCHLISTS.map((watchlist) => ({ ...watchlist }));
       return;
     }
 
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed.watchlists) || !parsed.watchlists.length) {
-      state.watchlists = [{ ...DEFAULT_WATCHLIST }];
+      state.watchlists = DEFAULT_WATCHLISTS.map((watchlist) => ({ ...watchlist }));
       return;
     }
 
@@ -113,8 +111,8 @@ function loadWatchlists() {
     }));
     state.activeWatchlistId = parsed.activeWatchlistId || state.watchlists[0].id;
   } catch {
-    state.watchlists = [{ ...DEFAULT_WATCHLIST }];
-    state.activeWatchlistId = DEFAULT_WATCHLIST.id;
+    state.watchlists = DEFAULT_WATCHLISTS.map((watchlist) => ({ ...watchlist }));
+    state.activeWatchlistId = DEFAULT_WATCHLISTS[0].id;
   }
 }
 
@@ -263,7 +261,6 @@ function renderWatchlistDrawer() {
 
   elements.watchlistDrawerTitle.textContent = active?.name || "我的自選";
   elements.watchlistDrawerMeta.textContent = `${active?.stocks.length || 0} 檔股票`;
-  elements.watchlistRenameInput.value = active?.name || "";
   elements.deleteWatchlistButton.disabled = state.watchlists.length <= 1;
 
   if (!active || !active.stocks.length) {
@@ -883,27 +880,36 @@ elements.watchlistDrawer.addEventListener("click", (event) => {
   }
 });
 
-elements.watchlistCreateForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const name = elements.watchlistCreateInput.value.trim();
+elements.addWatchlistButton.addEventListener("click", () => {
+  const name = window.prompt("請輸入新的自選組合名稱", `自選${state.watchlists.length + 1}`);
   if (!name) {
+    return;
+  }
+  const trimmedName = name.trim();
+  if (!trimmedName) {
     elements.watchlistManagerState.textContent = "請輸入組合名稱。";
     return;
   }
-  createWatchlist(name);
-  elements.watchlistCreateInput.value = "";
-  elements.watchlistManagerState.textContent = `已新增「${name}」。`;
+  createWatchlist(trimmedName);
+  elements.watchlistManagerState.textContent = `已新增「${trimmedName}」。`;
 });
 
-elements.watchlistRenameForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const name = elements.watchlistRenameInput.value.trim();
+elements.renameWatchlistButton.addEventListener("click", () => {
+  const active = getActiveWatchlist();
+  if (!active) {
+    return;
+  }
+  const name = window.prompt("請輸入新的組合名稱", active.name);
   if (!name) {
+    return;
+  }
+  const trimmedName = name.trim();
+  if (!trimmedName) {
     elements.watchlistManagerState.textContent = "請輸入新的組合名稱。";
     return;
   }
-  renameActiveWatchlist(name);
-  elements.watchlistManagerState.textContent = `已改名為「${name}」。`;
+  renameActiveWatchlist(trimmedName);
+  elements.watchlistManagerState.textContent = `已改名為「${trimmedName}」。`;
 });
 
 elements.deleteWatchlistButton.addEventListener("click", () => {
