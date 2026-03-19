@@ -37,6 +37,96 @@ function tail(rows, count) {
   return rows.slice(-Math.max(1, Math.min(rows.length, count)));
 }
 
+function roundIndicator(value) {
+  return Number.isFinite(value) ? Number(value.toFixed(6)) : null;
+}
+
+function calculateEMA(values, period) {
+  if (!values.length) {
+    return [];
+  }
+
+  const multiplier = 2 / (period + 1);
+  const ema = [];
+  let previous = values[0];
+
+  values.forEach((value, index) => {
+    if (index === 0) {
+      ema.push(previous);
+      return;
+    }
+    previous = ((value - previous) * multiplier) + previous;
+    ema.push(previous);
+  });
+
+  return ema;
+}
+
+function buildMacdFromCandles(candleRows, options = {}) {
+  const closes = candleRows.map((row) => Number(row.close)).filter(Number.isFinite);
+  if (closes.length < 35) {
+    return [];
+  }
+
+  const fastPeriod = options.fast || 12;
+  const slowPeriod = options.slow || 26;
+  const signalPeriod = options.signal || 9;
+
+  const emaFast = calculateEMA(closes, fastPeriod);
+  const emaSlow = calculateEMA(closes, slowPeriod);
+  const macdLineValues = closes.map((_, index) => emaFast[index] - emaSlow[index]);
+  const signalLineValues = calculateEMA(macdLineValues, signalPeriod);
+
+  return candleRows.map((row, index) => ({
+    date: row.date,
+    macdLine: roundIndicator(macdLineValues[index]),
+    signalLine: roundIndicator(signalLineValues[index]),
+    histogram: roundIndicator(macdLineValues[index] - signalLineValues[index])
+  }));
+}
+
+function buildKdjFromCandles(candleRows, options = {}) {
+  const period = options.period || 9;
+  if (candleRows.length < period) {
+    return [];
+  }
+
+  const rows = [];
+  let previousK = 50;
+  let previousD = 50;
+
+  candleRows.forEach((row, index) => {
+    const window = candleRows.slice(Math.max(0, index - period + 1), index + 1);
+    const highs = window.map((item) => Number(item.high)).filter(Number.isFinite);
+    const lows = window.map((item) => Number(item.low)).filter(Number.isFinite);
+    const close = Number(row.close);
+
+    if (!highs.length || !lows.length || !Number.isFinite(close)) {
+      return;
+    }
+
+    const highestHigh = Math.max(...highs);
+    const lowestLow = Math.min(...lows);
+    const denominator = highestHigh - lowestLow;
+    const rsv = denominator === 0 ? 50 : ((close - lowestLow) / denominator) * 100;
+    const k = ((2 / 3) * previousK) + ((1 / 3) * rsv);
+    const d = ((2 / 3) * previousD) + ((1 / 3) * k);
+    const j = (3 * k) - (2 * d);
+
+    previousK = k;
+    previousD = d;
+
+    rows.push({
+      date: row.date,
+      k: roundIndicator(k),
+      d: roundIndicator(d),
+      j: roundIndicator(j)
+    });
+  });
+
+  return rows;
+}
+
 async function getSectors() {
   return getSectorsWithCounts();
 }
@@ -143,8 +233,8 @@ async function getStockDetail(symbolInput) {
   const kdj = kdjResult.value;
 
   const candleRows = candles?.data || [];
-  const macdRows = macd?.data || [];
-  const kdjRows = kdj?.data || [];
+  const macdRows = (macd?.data && macd.data.length) ? macd.data : buildMacdFromCandles(candleRows);
+  const kdjRows = (kdj?.data && kdj.data.length) ? kdj.data : buildKdjFromCandles(candleRows);
   const latestCandle = lastRow(candleRows);
   const latestMacd = lastRow(macdRows);
   const latestKdj = lastRow(kdjRows);
