@@ -765,7 +765,7 @@ function renderDetailCharts(detail) {
 function renderDetail(detail) {
   state.selectedSymbol = detail.symbol;
   state.detail = detail;
-  elements.detailTitle.textContent = `${detail.symbol} 單股分析`;
+  elements.detailTitle.textContent = "????";
   elements.detailDateLabel.textContent = detail.quote.tradeDate ? `交易日期 ${detail.quote.tradeDate}` : "尚未取得交易日期";
   elements.detailSymbol.textContent = detail.symbol;
   elements.detailName.textContent = detail.quote.name || detail.symbol;
@@ -815,8 +815,8 @@ function renderDetail(detail) {
 function renderDetailError(message) {
   state.detail = null;
   state.selectedSymbol = "";
-  elements.detailTitle.textContent = "查詢失敗";
-  elements.detailDateLabel.textContent = "請稍後再試";
+  elements.detailTitle.textContent = "????";
+  elements.detailDateLabel.textContent = "????";
   elements.detailSymbol.textContent = "-";
   elements.detailName.textContent = message;
   elements.detailClosePrice.textContent = "-";
@@ -837,7 +837,7 @@ function renderDetailError(message) {
 }
 
 function renderDetailLoading(symbol) {
-  elements.detailTitle.textContent = `正在載入 ${symbol}`;
+  elements.detailTitle.textContent = "????";
   setDetailState("正在整理單股資料與技術圖表...");
 }
 

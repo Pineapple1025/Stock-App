@@ -112,8 +112,8 @@
     <section class="detail-card reveal-up" id="detailCard">
       <div class="section-head detail-head">
         <div>
-          <p class="panel-label">單股分析</p>
-          <h2 id="detailTitle">輸入股票代碼後查看完整資訊</h2>
+          <p class="panel-label detail-kicker">單股分析</p>
+          <h2 id="detailTitle">單股分析</h2>
         </div>
         <div class="detail-head-actions">
           <button id="detailFavoriteButton" class="favorite-button favorite-button-large" type="button" aria-label="收藏目前股票">♡</button>
@@ -125,9 +125,11 @@
       <div class="detail-grid">
         <article class="detail-summary">
           <div class="detail-price-row">
-            <div>
-              <p class="stock-code" id="detailSymbol">-</p>
-              <h3 class="stock-name" id="detailName">等待查詢股票</h3>
+            <div class="detail-name-block">
+              <h3 class="stock-name">
+                <span id="detailName">等待查詢股票</span>
+                <small id="detailSymbol" class="detail-inline-symbol">-</small>
+              </h3>
             </div>
             <div class="stock-score">
               <strong class="score-value" id="detailClosePrice">-</strong>
