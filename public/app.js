@@ -1,16 +1,7 @@
 const HORIZONS = {
-  short: {
-    label: "短期",
-    note: "短期模型規劃採用 TCN-Transformer，並保留 MASTER 架構作為後續升級方向，主要觀察 5 到 20 個交易日。"
-  },
-  mid: {
-    label: "中期",
-    note: "中期模型規劃採用 XGBoost / LightGBM，重點放在 1 到 3 個月的趨勢延續與基本面變化。"
-  },
-  long: {
-    label: "長期",
-    note: "長期模型規劃採用 Bayesian Neural Networks，評估 3 到 12 個月的趨勢、成長與估值。"
-  }
+  short: { label: "短期" },
+  mid: { label: "中期" },
+  long: { label: "長期" }
 };
 
 const state = {
@@ -33,7 +24,6 @@ const elements = {
   topStockLabel: document.querySelector("#topStockLabel"),
   dataSourceBadge: document.querySelector("#dataSourceBadge"),
   refreshButton: document.querySelector("#refreshButton"),
-  algorithmNotes: document.querySelector("#algorithmNotes"),
   template: document.querySelector("#stockCardTemplate"),
   stockSearchForm: document.querySelector("#stockSearchForm"),
   stockSymbolInput: document.querySelector("#stockSymbolInput"),
@@ -165,16 +155,6 @@ function renderHorizonTabs() {
       }
     });
     elements.horizonTabs.appendChild(button);
-  });
-}
-
-function renderNotes() {
-  elements.algorithmNotes.innerHTML = "";
-  Object.values(HORIZONS).forEach((item) => {
-    const card = document.createElement("article");
-    card.className = "note-card";
-    card.innerHTML = `<h3>${item.label}</h3><p>${item.note}</p>`;
-    elements.algorithmNotes.appendChild(card);
   });
 }
 
@@ -526,7 +506,6 @@ async function loadSectors() {
   state.sectors = result.sectors;
   renderSectorTabs();
   renderHorizonTabs();
-  renderNotes();
 }
 
 async function loadAnalysis() {
