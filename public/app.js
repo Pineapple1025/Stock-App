@@ -16,7 +16,9 @@ const HORIZONS = {
 const state = {
   sectors: [],
   sector: "ai",
-  horizon: "short"
+  horizon: "short",
+  view: "home",
+  selectedSymbol: ""
 };
 
 const elements = {
@@ -51,10 +53,9 @@ const elements = {
   priceChart: document.querySelector("#priceChart"),
   indicatorChart: document.querySelector("#indicatorChart"),
   detailState: document.querySelector("#detailState"),
-  debugPayload: document.querySelector("#debugPayload")
+  backToHomeButton: document.querySelector("#backToHomeButton"),
+  detailCard: document.querySelector("#detailCard")
 };
-
-const BUILD_VERSION = "20260319-debug-1";
 
 async function fetchJson(url) {
   const requestUrl = url.includes("?")
@@ -87,11 +88,25 @@ function setDetailState(message) {
   elements.detailState.textContent = message || "";
 }
 
-function renderDebugPayload(payload) {
-  if (!elements.debugPayload) {
-    return;
+function setViewMode(view, options = {}) {
+  state.view = view;
+  document.body.classList.toggle("single-stock-mode", view === "detail");
+  document.body.classList.toggle("home-mode", view !== "detail");
+  elements.backToHomeButton.hidden = view !== "detail";
+
+  if (view === "detail" && options.scroll !== false) {
+    elements.detailCard?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  elements.debugPayload.textContent = JSON.stringify(payload, null, 2);
+}
+
+function syncHistory(symbol) {
+  const url = new URL(window.location.href);
+  if (symbol) {
+    url.searchParams.set("stock", symbol);
+  } else {
+    url.searchParams.delete("stock");
+  }
+  window.history.pushState({ stock: symbol || null }, "", url);
 }
 
 function appendListItems(container, items, fallbackText) {
@@ -194,8 +209,7 @@ function renderStocks(result) {
     card.style.cursor = "pointer";
     card.addEventListener("click", () => {
       elements.stockSymbolInput.value = stock.symbol;
-      loadStockDetail(stock.symbol);
-      document.querySelector(".detail-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      loadStockDetail(stock.symbol, { focus: true, pushHistory: true });
     });
 
     elements.stockList.appendChild(fragment);
@@ -283,6 +297,7 @@ function renderIndicatorChart(detail) {
 }
 
 function renderDetail(detail) {
+  state.selectedSymbol = detail.symbol;
   elements.detailTitle.textContent = `${detail.symbol} 單股分析`;
   elements.detailDateLabel.textContent = detail.quote.tradeDate ? `資料日期 ${detail.quote.tradeDate}` : "目前無最新日期";
   elements.detailSymbol.textContent = detail.symbol;
@@ -381,17 +396,6 @@ function renderDetail(detail) {
   renderPriceChart(detail);
   renderIndicatorChart(detail);
   setDetailState(`單股資料來源 ${detail.profile.universeSource}`);
-  renderDebugPayload({
-    buildVersion: BUILD_VERSION,
-    symbol: detail.symbol,
-    latestIndicators: detail.latestIndicators,
-    window1d: detail.windows["1d"],
-    seriesLength: {
-      candles: detail.series.candles.length,
-      macd: detail.series.macd.length,
-      kdj: detail.series.kdj.length
-    }
-  });
 }
 
 function renderDetailError(message) {
@@ -411,19 +415,11 @@ function renderDetailError(message) {
   elements.priceChart.innerHTML = "<p>目前沒有圖表資料。</p>";
   elements.indicatorChart.innerHTML = "<p>目前沒有圖表資料。</p>";
   setDetailState(message);
-  renderDebugPayload({
-    buildVersion: BUILD_VERSION,
-    error: message
-  });
 }
 
 function renderDetailLoading(symbol) {
   elements.detailTitle.textContent = `正在載入 ${symbol}`;
   setDetailState("正在取得單股資料與技術指標...");
-  renderDebugPayload({
-    buildVersion: BUILD_VERSION,
-    loading: symbol
-  });
 }
 
 async function loadSectors() {
@@ -449,13 +445,32 @@ async function loadAnalysis() {
   }
 }
 
-async function loadStockDetail(symbol) {
+async function loadStockDetail(symbol, options = {}) {
+  const { focus = false, pushHistory = false } = options;
   renderDetailLoading(symbol);
   try {
     const detail = await fetchJson(`/api/stock/${symbol}`);
     renderDetail(detail);
+    if (focus) {
+      setViewMode("detail");
+    }
+    if (pushHistory) {
+      syncHistory(symbol);
+    }
   } catch (error) {
     renderDetailError(error.message);
+    if (focus) {
+      setViewMode("detail");
+    }
+  }
+}
+
+function goHome(options = {}) {
+  const { pushHistory = false } = options;
+  state.selectedSymbol = "";
+  setViewMode("home", { scroll: true });
+  if (pushHistory) {
+    syncHistory("");
   }
 }
 
@@ -466,6 +481,10 @@ elements.refreshButton.addEventListener("click", () => {
   }
 });
 
+elements.backToHomeButton.addEventListener("click", () => {
+  goHome({ pushHistory: true });
+});
+
 elements.stockSearchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const symbol = elements.stockSymbolInput.value.trim();
@@ -473,12 +492,28 @@ elements.stockSearchForm.addEventListener("submit", async (event) => {
     renderDetailError("請輸入 4 位股票代碼。");
     return;
   }
-  await loadStockDetail(symbol);
+  await loadStockDetail(symbol, { focus: true, pushHistory: true });
+});
+
+window.addEventListener("popstate", () => {
+  const symbol = new URL(window.location.href).searchParams.get("stock");
+  if (symbol) {
+    elements.stockSymbolInput.value = symbol;
+    loadStockDetail(symbol, { focus: true, pushHistory: false });
+    return;
+  }
+  goHome({ pushHistory: false });
 });
 
 async function bootstrap() {
   await loadSectors();
   await loadAnalysis();
+  const symbolFromUrl = new URL(window.location.href).searchParams.get("stock");
+  if (symbolFromUrl) {
+    elements.stockSymbolInput.value = symbolFromUrl;
+    await loadStockDetail(symbolFromUrl, { focus: true, pushHistory: false });
+    return;
+  }
   elements.stockSymbolInput.value = "2330";
   loadStockDetail("2330");
 }

@@ -304,6 +304,16 @@ h1 {
   font-weight: 600;
 }
 
+.detail-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.detail-back-button {
+  white-space: nowrap;
+}
+
 .section-head {
   display: flex;
   justify-content: space-between;
@@ -506,5 +516,43 @@ h1 {
 
   .score-value {
     text-align: left;
+  }
+
+  .detail-head-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+body.single-stock-mode .hero-card,
+body.single-stock-mode .layout {
+  display: none;
+}
+
+body.single-stock-mode .detail-card {
+  margin-top: 0;
+}
+
+@media (max-width: 700px) {
+  body.single-stock-mode .topbar {
+    position: sticky;
+    top: 10px;
+    z-index: 10;
+  }
+
+  body.single-stock-mode .app-shell {
+    padding-top: 12px;
+  }
+
+  body.single-stock-mode .detail-card {
+    padding: 16px;
+    border-radius: 22px;
+  }
+
+  body.single-stock-mode .detail-grid,
+  body.single-stock-mode .detail-grid-bottom,
+  body.single-stock-mode .horizon-score-grid,
+  body.single-stock-mode .window-row {
+    grid-template-columns: 1fr;
   }
 }

@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css?v=20260319-1">
 </head>
-<body>
+<body class="home-mode">
   <div class="bg-orb orb-left"></div>
   <div class="bg-orb orb-right"></div>
 
@@ -85,13 +85,16 @@
       </section>
     </main>
 
-    <section class="detail-card">
+    <section class="detail-card" id="detailCard">
       <div class="section-head">
         <div>
           <p class="panel-label">單股詳情</p>
           <h2 id="detailTitle">輸入股票代碼後查看單股分析</h2>
         </div>
-        <p class="muted" id="detailDateLabel">等待查詢</p>
+        <div class="detail-head-actions">
+          <p class="muted" id="detailDateLabel">等待查詢</p>
+          <button id="backToHomeButton" class="ghost-button detail-back-button" type="button" hidden>返回首頁</button>
+        </div>
       </div>
 
       <div class="detail-grid">
@@ -141,10 +144,6 @@
       </div>
 
       <div id="detailState" class="detail-state" aria-live="polite"></div>
-      <details class="detail-summary" open>
-        <summary>偵錯資訊</summary>
-        <pre id="debugPayload" class="debug-box">等待單股資料...</pre>
-      </details>
     </section>
   </div>
 
