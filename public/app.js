@@ -54,7 +54,12 @@ const elements = {
 };
 
 async function fetchJson(url) {
-  const response = await fetch(url);
+  const requestUrl = url.includes("?")
+    ? `${url}&_ts=${Date.now()}`
+    : `${url}?_ts=${Date.now()}`;
+  const response = await fetch(requestUrl, {
+    cache: "no-store"
+  });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = body.message || `請求失敗，狀態碼 ${response.status}`;
