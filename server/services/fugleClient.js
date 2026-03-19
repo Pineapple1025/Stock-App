@@ -1,4 +1,5 @@
 const { fugleApiKey, fugleBaseUrl } = require("../config");
+const fetchClient = require("../utils/fetchClient");
 
 function buildUrl(path, query = {}) {
   const url = new URL(`${fugleBaseUrl}${path}`);
@@ -15,7 +16,7 @@ async function request(path, query) {
     return null;
   }
 
-  const response = await fetch(buildUrl(path, query), {
+  const response = await fetchClient(buildUrl(path, query), {
     headers: {
       "X-API-KEY": fugleApiKey
     }

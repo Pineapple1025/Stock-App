@@ -5,6 +5,7 @@ const {
   SECTOR_MEMBERSHIPS: FALLBACK_MEMBERSHIPS,
   getStockSectors: getFallbackStockSectors
 } = require("../data/sectors");
+const fetchClient = require("../utils/fetchClient");
 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 6;
 const REVENUE_API = "https://openapi.twse.com.tw/v1/opendata/t187ap05_P";
@@ -69,7 +70,7 @@ function buildIndustryMemberships(stocks) {
 }
 
 async function fetchJson(url) {
-  const response = await fetch(url, {
+  const response = await fetchClient(url, {
     headers: {
       Accept: "application/json"
     }
