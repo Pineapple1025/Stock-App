@@ -3,41 +3,57 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>台股智慧分析平台</title>
+  <title>台股訊號研究室</title>
+  <meta name="description" content="台股多週期分析平台，整合產業分類、短中長期評分、單股技術圖表與自選收藏。">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=20260319-3">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css?v=20260319-editorial-1">
 </head>
 <body class="home-mode">
   <div class="bg-orb orb-left"></div>
   <div class="bg-orb orb-right"></div>
+  <div class="grain-layer"></div>
 
   <div class="app-shell">
     <header class="topbar">
-      <div>
-        <p class="eyebrow">Taiwan Equity Signals</p>
-        <h1>台股智慧分析平台</h1>
+      <div class="brand-block reveal-up">
+        <p class="eyebrow">Taiwan Equity Research Desk</p>
+        <h1>台股訊號研究室</h1>
       </div>
-      <div class="topbar-meta">
-        <span class="badge" id="dataSourceBadge">資料來源載入中</span>
-        <button class="ghost-button" id="watchlistManagerButton" type="button">自選組合</button>
+
+      <nav class="topbar-nav reveal-up" aria-label="主要功能">
+        <a href="#heroSection">首頁</a>
+        <a href="#sectorTabs">產業</a>
+        <a href="#resultTitle">排行</a>
+        <a href="#detailCard">單股</a>
+      </nav>
+
+      <div class="topbar-meta reveal-up">
+        <span class="badge" id="dataSourceBadge">資料來源</span>
+        <button class="ghost-button" id="watchlistManagerButton" type="button">收藏管理</button>
         <button class="ghost-button" id="refreshButton" type="button">重新整理</button>
       </div>
     </header>
 
-    <section class="hero-card">
-      <div class="hero-copy hero-copy-welcome">
-        <h2>歡迎回來</h2>
+    <section class="hero-card" id="heroSection">
+      <div class="hero-copy hero-copy-welcome reveal-up">
+        <p class="hero-kicker">Welcome back</p>
+        <h2>從產業脈動到單一股票，<br>把判讀留給更清楚的畫面。</h2>
+        <p class="hero-description">
+          先搜尋代碼，或從下方產業排行切入。
+          你會看到短期、中期、長期的強弱評分，以及價格、MACD、KD 的分開圖表。
+        </p>
         <form id="stockSearchForm" class="search-bar">
           <input id="stockSymbolInput" type="text" inputmode="numeric" placeholder="輸入 4 位股票代碼，例如 2330">
           <button type="submit">查詢股票</button>
         </form>
       </div>
-      <div class="hero-grid">
+
+      <div class="hero-grid reveal-up">
         <article class="hero-metric">
-          <span>目前產業</span>
-          <strong id="activeSectorLabel">資料載入中</strong>
+          <span>目前焦點產業</span>
+          <strong id="activeSectorLabel">載入中</strong>
         </article>
         <article class="hero-metric">
           <span>分析週期</span>
@@ -48,21 +64,27 @@
           <strong id="bullishCount">0 檔</strong>
         </article>
         <article class="hero-metric">
-          <span>目前最強</span>
-          <strong id="topStockLabel">資料載入中</strong>
+          <span>本區第一名</span>
+          <strong id="topStockLabel">載入中</strong>
         </article>
       </div>
     </section>
 
     <main class="layout">
-      <aside class="sidebar-card">
-        <section>
-          <p class="panel-label">產業分類</p>
+      <aside class="sidebar-card reveal-up">
+        <section class="sidebar-section">
+          <div class="sidebar-intro">
+            <p class="panel-label">產業分類</p>
+            <p class="muted">以主題與產業切入，先篩出值得進一步看的股票。</p>
+          </div>
           <div id="sectorTabs" class="stack-tabs"></div>
         </section>
 
-        <section>
-          <p class="panel-label">分析週期</p>
+        <section class="sidebar-section">
+          <div class="sidebar-intro">
+            <p class="panel-label">分析週期</p>
+            <p class="muted">切換短中長期，查看不同節奏下的偏多訊號。</p>
+          </div>
           <div id="horizonTabs" class="inline-tabs"></div>
         </section>
 
@@ -72,33 +94,33 @@
               <p class="panel-label">自選組合</p>
               <h3 id="activeWatchlistName">我的自選</h3>
             </div>
-            <button class="ghost-button small-button" id="watchlistQuickOpenButton" type="button">管理</button>
+            <button class="ghost-button small-button" id="watchlistQuickOpenButton" type="button">展開</button>
           </div>
           <div id="watchlistPreview" class="watchlist-preview"></div>
         </section>
       </aside>
 
-      <section class="content-card">
+      <section class="content-card reveal-up">
         <div class="section-head">
           <div>
-            <p class="panel-label">產業排行</p>
-            <h2 id="resultTitle">分析結果</h2>
+            <p class="panel-label">本期排行</p>
+            <h2 id="resultTitle">產業分析</h2>
           </div>
-          <p class="muted" id="generatedAtLabel">資料載入中</p>
+          <p class="muted" id="generatedAtLabel">更新時間</p>
         </div>
         <div id="stockList" class="stock-list"></div>
       </section>
     </main>
 
-    <section class="detail-card" id="detailCard">
-      <div class="section-head">
+    <section class="detail-card reveal-up" id="detailCard">
+      <div class="section-head detail-head">
         <div>
           <p class="panel-label">單股分析</p>
-          <h2 id="detailTitle">輸入股票代碼查看詳細資訊</h2>
+          <h2 id="detailTitle">輸入股票代碼後查看完整資訊</h2>
         </div>
         <div class="detail-head-actions">
-          <button id="detailFavoriteButton" class="favorite-button favorite-button-large" type="button" aria-label="收藏這檔股票">♡</button>
-          <p class="muted" id="detailDateLabel">等待查詢</p>
+          <button id="detailFavoriteButton" class="favorite-button favorite-button-large" type="button" aria-label="收藏目前股票">♡</button>
+          <p class="muted" id="detailDateLabel">最新更新</p>
           <button id="backToHomeButton" class="ghost-button detail-back-button" type="button" hidden>返回首頁</button>
         </div>
       </div>
@@ -108,7 +130,7 @@
           <div class="detail-price-row">
             <div>
               <p class="stock-code" id="detailSymbol">-</p>
-              <h3 class="stock-name" id="detailName">請先輸入股票代碼</h3>
+              <h3 class="stock-name" id="detailName">等待查詢股票</h3>
             </div>
             <div class="stock-score">
               <strong class="score-value" id="detailClosePrice">-</strong>
@@ -123,8 +145,8 @@
         <article class="detail-indicators">
           <div class="detail-indicator-head">
             <div>
-              <h3>技術圖表</h3>
-              <p class="muted">切換區間後，圖表與指標摘要會同步更新。</p>
+              <h3>區間切換</h3>
+              <p class="muted">切換不同日期區間時，下方價格圖、MACD、KD 會同步更新。</p>
             </div>
             <div id="detailRangeTabs" class="range-tabs"></div>
           </div>
@@ -149,8 +171,19 @@
           <div id="priceChart" class="chart-box"></div>
         </article>
         <article class="detail-summary">
-          <h3>MACD 與 KDJ</h3>
+          <h3>MACD</h3>
           <div id="indicatorChart" class="chart-box"></div>
+        </article>
+      </div>
+
+      <div class="detail-grid detail-grid-bottom">
+        <article class="detail-summary">
+          <h3>KD</h3>
+          <div id="kdChart" class="chart-box"></div>
+        </article>
+        <article class="detail-summary">
+          <h3>指標摘要</h3>
+          <div id="indicatorSnapshotDetail" class="chart-box chart-box-compact"></div>
         </article>
       </div>
 
@@ -174,7 +207,7 @@
           <div class="section-head section-head-compact watchlist-list-head">
             <div>
               <h3>組合列表</h3>
-              <p class="muted">預設提供三個自選組合，也可以再新增。</p>
+              <p class="muted">切換不同組合，整理你想追蹤的股票名單。</p>
             </div>
             <button id="addWatchlistButton" class="ghost-button small-button" type="button">新增自選</button>
           </div>
@@ -207,7 +240,7 @@
           <h3 class="stock-name"></h3>
         </div>
         <div class="stock-card-actions">
-          <button class="favorite-button card-favorite-button" type="button" aria-label="收藏這檔股票">♡</button>
+          <button class="favorite-button card-favorite-button" type="button" aria-label="收藏目前股票">♡</button>
           <div class="stock-score">
             <strong class="score-value"></strong>
             <p class="star-rating"></p>
@@ -233,6 +266,6 @@
     </article>
   </template>
 
-  <script src="./app.js?v=20260319-3"></script>
+  <script src="./app.js?v=20260319-editorial-1"></script>
 </body>
 </html>

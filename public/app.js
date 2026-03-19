@@ -1,4 +1,4 @@
-const BUILD_VERSION = "20260319-watchlist-1";
+const BUILD_VERSION = "20260319-indicators-1";
 const WATCHLIST_STORAGE_KEY = "stock-app-watchlists-v1";
 
 const HORIZONS = {
@@ -32,8 +32,7 @@ const state = {
   detailRange: "1m",
   detail: null,
   watchlists: [],
-  activeWatchlistId: DEFAULT_WATCHLISTS[0].id,
-  watchlistDrawerOpen: false
+  activeWatchlistId: DEFAULT_WATCHLISTS[0].id
 };
 
 const elements = {
@@ -65,10 +64,12 @@ const elements = {
   detailHorizonScores: document.querySelector("#detailHorizonScores"),
   detailMetrics: document.querySelector("#detailMetrics"),
   indicatorSnapshot: document.querySelector("#indicatorSnapshot"),
+  indicatorSnapshotDetail: document.querySelector("#indicatorSnapshotDetail"),
   detailBullishReasons: document.querySelector("#detailBullishReasons"),
   detailRiskReasons: document.querySelector("#detailRiskReasons"),
   priceChart: document.querySelector("#priceChart"),
   indicatorChart: document.querySelector("#indicatorChart"),
+  kdChart: document.querySelector("#kdChart"),
   detailState: document.querySelector("#detailState"),
   backToHomeButton: document.querySelector("#backToHomeButton"),
   detailCard: document.querySelector("#detailCard"),
@@ -90,28 +91,90 @@ function makeId() {
   return `list-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
+function formatNumber(value, digits = 2) {
+  return value === null || value === undefined || Number.isNaN(Number(value))
+    ? "-"
+    : Number(value).toLocaleString("zh-TW", { maximumFractionDigits: digits });
+}
+
+function stars(count) {
+  return String.fromCharCode(9733).repeat(count) + String.fromCharCode(9734).repeat(5 - count);
+}
+
+function average(values) {
+  if (!values.length) {
+    return null;
+  }
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+async function fetchJson(url) {
+  const requestUrl = url.includes("?") ? `${url}&_ts=${Date.now()}` : `${url}?_ts=${Date.now()}`;
+  const response = await fetch(requestUrl, { cache: "no-store" });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(body.message || `資料載入失敗，狀態碼 ${response.status}`);
+  }
+  return body;
+}
+
+function setDetailState(message) {
+  elements.detailState.textContent = message || "";
+}
+
+function syncHistory(symbol) {
+  const url = new URL(window.location.href);
+  if (symbol) {
+    url.searchParams.set("stock", symbol);
+  } else {
+    url.searchParams.delete("stock");
+  }
+  window.history.pushState({ stock: symbol || null }, "", url);
+}
+
+function setViewMode(view, options = {}) {
+  state.view = view;
+  document.body.classList.toggle("single-stock-mode", view === "detail");
+  document.body.classList.toggle("home-mode", view !== "detail");
+  elements.backToHomeButton.hidden = view !== "detail";
+  if (view === "detail" && options.scroll !== false) {
+    elements.detailCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function appendListItems(container, items, fallbackText) {
+  container.innerHTML = "";
+  if (!items.length) {
+    const item = document.createElement("li");
+    item.textContent = fallbackText;
+    container.appendChild(item);
+    return;
+  }
+  items.forEach((text) => {
+    const item = document.createElement("li");
+    item.textContent = text;
+    container.appendChild(item);
+  });
+}
+
 function loadWatchlists() {
   try {
     const raw = localStorage.getItem(WATCHLIST_STORAGE_KEY);
     if (!raw) {
-      state.watchlists = DEFAULT_WATCHLISTS.map((watchlist) => ({ ...watchlist }));
+      state.watchlists = DEFAULT_WATCHLISTS.map((item) => ({ ...item }));
       return;
     }
-
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed.watchlists) || !parsed.watchlists.length) {
-      state.watchlists = DEFAULT_WATCHLISTS.map((watchlist) => ({ ...watchlist }));
-      return;
-    }
-
-    state.watchlists = parsed.watchlists.map((watchlist) => ({
-      id: watchlist.id || makeId(),
-      name: watchlist.name || "未命名組合",
-      stocks: Array.isArray(watchlist.stocks) ? watchlist.stocks : []
-    }));
+    state.watchlists = Array.isArray(parsed.watchlists) && parsed.watchlists.length
+      ? parsed.watchlists.map((watchlist) => ({
+          id: watchlist.id || makeId(),
+          name: watchlist.name || "未命名組合",
+          stocks: Array.isArray(watchlist.stocks) ? watchlist.stocks : []
+        }))
+      : DEFAULT_WATCHLISTS.map((item) => ({ ...item }));
     state.activeWatchlistId = parsed.activeWatchlistId || state.watchlists[0].id;
   } catch {
-    state.watchlists = DEFAULT_WATCHLISTS.map((watchlist) => ({ ...watchlist }));
+    state.watchlists = DEFAULT_WATCHLISTS.map((item) => ({ ...item }));
     state.activeWatchlistId = DEFAULT_WATCHLISTS[0].id;
   }
 }
@@ -128,8 +191,7 @@ function getActiveWatchlist() {
 }
 
 function isStockInActiveWatchlist(symbol) {
-  const active = getActiveWatchlist();
-  return active?.stocks.some((stock) => stock.symbol === symbol);
+  return getActiveWatchlist()?.stocks.some((stock) => stock.symbol === symbol);
 }
 
 function updateFavoriteButton(button, symbol) {
@@ -137,7 +199,6 @@ function updateFavoriteButton(button, symbol) {
   button.classList.toggle("is-active", active);
   button.textContent = active ? "♥" : "♡";
   button.setAttribute("aria-pressed", String(active));
-  button.title = active ? "從目前自選移除" : "加入目前自選";
 }
 
 function persistAndRenderWatchlists() {
@@ -152,27 +213,19 @@ function addStockToActiveWatchlist(stock) {
   if (!active) {
     return;
   }
-
   const exists = active.stocks.some((item) => item.symbol === stock.symbol);
   if (exists) {
     active.stocks = active.stocks.filter((item) => item.symbol !== stock.symbol);
     elements.watchlistManagerState.textContent = `${stock.symbol} 已從「${active.name}」移除。`;
   } else {
-    active.stocks.unshift({
-      symbol: stock.symbol,
-      name: stock.name || stock.symbol
-    });
+    active.stocks.unshift({ symbol: stock.symbol, name: stock.name || stock.symbol });
     elements.watchlistManagerState.textContent = `${stock.symbol} 已加入「${active.name}」。`;
   }
   persistAndRenderWatchlists();
 }
 
 function createWatchlist(name) {
-  state.watchlists.push({
-    id: makeId(),
-    name,
-    stocks: []
-  });
+  state.watchlists.push({ id: makeId(), name, stocks: [] });
   state.activeWatchlistId = state.watchlists.at(-1).id;
   persistAndRenderWatchlists();
 }
@@ -191,12 +244,7 @@ function deleteActiveWatchlist() {
     elements.watchlistManagerState.textContent = "至少要保留一個自選組合。";
     return;
   }
-
   const index = state.watchlists.findIndex((watchlist) => watchlist.id === state.activeWatchlistId);
-  if (index === -1) {
-    return;
-  }
-
   const removed = state.watchlists[index];
   state.watchlists.splice(index, 1);
   state.activeWatchlistId = state.watchlists[Math.max(0, index - 1)].id;
@@ -205,14 +253,12 @@ function deleteActiveWatchlist() {
 }
 
 function openWatchlistDrawer() {
-  state.watchlistDrawerOpen = true;
   elements.watchlistDrawer.hidden = false;
   document.body.classList.add("watchlist-open");
   renderWatchlistDrawer();
 }
 
 function closeWatchlistDrawer() {
-  state.watchlistDrawerOpen = false;
   elements.watchlistDrawer.hidden = true;
   document.body.classList.remove("watchlist-open");
 }
@@ -220,19 +266,16 @@ function closeWatchlistDrawer() {
 function renderWatchlistPreview() {
   const active = getActiveWatchlist();
   elements.activeWatchlistName.textContent = active?.name || "我的自選";
-
   if (!active || !active.stocks.length) {
     elements.watchlistPreview.innerHTML = '<p class="muted">還沒有收藏股票，點卡片右上角愛心就能加入目前自選。</p>';
     return;
   }
-
   elements.watchlistPreview.innerHTML = active.stocks.slice(0, 5).map((stock) => `
     <button class="watchlist-preview-item" type="button" data-symbol="${stock.symbol}">
       <strong>${stock.symbol}</strong>
       <span>${stock.name}</span>
     </button>
   `).join("");
-
   elements.watchlistPreview.querySelectorAll("[data-symbol]").forEach((button) => {
     button.addEventListener("click", () => {
       const { symbol } = button.dataset;
@@ -245,7 +288,6 @@ function renderWatchlistPreview() {
 function renderWatchlistDrawer() {
   const active = getActiveWatchlist();
   elements.watchlistTabs.innerHTML = "";
-
   state.watchlists.forEach((watchlist) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -298,7 +340,6 @@ function syncFavoriteButtons() {
   document.querySelectorAll("[data-favorite-symbol]").forEach((button) => {
     updateFavoriteButton(button, button.dataset.favoriteSymbol);
   });
-
   if (state.selectedSymbol) {
     updateFavoriteButton(elements.detailFavoriteButton, state.selectedSymbol);
   } else {
@@ -307,73 +348,13 @@ function syncFavoriteButtons() {
   }
 }
 
-async function fetchJson(url) {
-  const requestUrl = url.includes("?") ? `${url}&_ts=${Date.now()}` : `${url}?_ts=${Date.now()}`;
-  const response = await fetch(requestUrl, { cache: "no-store" });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const message = body.message || `資料載入失敗，狀態碼 ${response.status}`;
-    throw new Error(message);
-  }
-  return body;
-}
-
-function stars(count) {
-  return String.fromCharCode(9733).repeat(count) + String.fromCharCode(9734).repeat(5 - count);
-}
-
-function formatNumber(value, digits = 2) {
-  return value === null || value === undefined || Number.isNaN(Number(value))
-    ? "-"
-    : Number(value).toLocaleString("zh-TW", { maximumFractionDigits: digits });
-}
-
-function average(values) {
-  if (!values.length) {
-    return null;
-  }
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function setDetailState(message) {
-  elements.detailState.textContent = message || "";
-}
-
-function setViewMode(view, options = {}) {
-  state.view = view;
-  document.body.classList.toggle("single-stock-mode", view === "detail");
-  document.body.classList.toggle("home-mode", view !== "detail");
-  elements.backToHomeButton.hidden = view !== "detail";
-
-  if (view === "detail" && options.scroll !== false) {
-    elements.detailCard?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-}
-
-function syncHistory(symbol) {
-  const url = new URL(window.location.href);
-  if (symbol) {
-    url.searchParams.set("stock", symbol);
-  } else {
-    url.searchParams.delete("stock");
-  }
-  window.history.pushState({ stock: symbol || null }, "", url);
-}
-
-function appendListItems(container, items, fallbackText) {
-  container.innerHTML = "";
-  if (!items.length) {
-    const item = document.createElement("li");
-    item.textContent = fallbackText;
-    container.appendChild(item);
-    return;
-  }
-
-  items.forEach((text) => {
-    const item = document.createElement("li");
-    item.textContent = text;
-    container.appendChild(item);
-  });
+function bindFavoriteButton(button, stock) {
+  button.dataset.favoriteSymbol = stock.symbol;
+  updateFavoriteButton(button, stock.symbol);
+  button.onclick = (event) => {
+    event.stopPropagation();
+    addStockToActiveWatchlist(stock);
+  };
 }
 
 function renderSectorTabs() {
@@ -416,7 +397,6 @@ function renderSummary(result) {
   const activeSector = state.sectors.find((sector) => sector.id === state.sector);
   const topStock = result.stocks[0];
   const bullishCount = result.stocks.filter((stock) => stock.analysis.score >= 60).length;
-
   elements.resultTitle.textContent = `${activeSector?.label || "產業"} ${HORIZONS[state.horizon].label}分析`;
   elements.generatedAtLabel.textContent = `更新時間 ${new Date(result.generatedAt).toLocaleString("zh-TW")}`;
   elements.activeSectorLabel.textContent = activeSector?.label || "-";
@@ -426,23 +406,12 @@ function renderSummary(result) {
   elements.dataSourceBadge.textContent = result.dataSource === "fugle" ? "Fugle 即時資料" : "Fugle + 備援資料";
 }
 
-function bindFavoriteButton(button, stock) {
-  button.dataset.favoriteSymbol = stock.symbol;
-  updateFavoriteButton(button, stock.symbol);
-  button.onclick = (event) => {
-    event.stopPropagation();
-    addStockToActiveWatchlist(stock);
-  };
-}
-
 function renderStocks(result) {
   elements.stockList.innerHTML = "";
-
   if (!result.stocks.length) {
     elements.stockList.innerHTML = '<article class="note-card"><h3>目前沒有資料</h3><p>請稍後再試，或切換其他產業與週期。</p></article>';
     return;
   }
-
   result.stocks.forEach((stock) => {
     const fragment = elements.template.content.cloneNode(true);
     const card = fragment.querySelector(".stock-card");
@@ -452,21 +421,13 @@ function renderStocks(result) {
     fragment.querySelector(".star-rating").textContent = stars(stock.analysis.stars);
     fragment.querySelector(".signal-pill").textContent = stock.analysis.biasLabel;
     fragment.querySelector(".confidence-pill").textContent = `信心 ${stock.analysis.confidence}%`;
-
     appendListItems(fragment.querySelector(".bullish-reasons"), stock.analysis.bullishReasons, "目前沒有明確看漲因素。");
     appendListItems(fragment.querySelector(".risk-reasons"), stock.analysis.riskReasons, "目前沒有明確風險提醒。");
-
-    bindFavoriteButton(fragment.querySelector(".card-favorite-button"), {
-      symbol: stock.symbol,
-      name: stock.name
-    });
-
-    card.style.cursor = "pointer";
+    bindFavoriteButton(fragment.querySelector(".card-favorite-button"), { symbol: stock.symbol, name: stock.name });
     card.addEventListener("click", () => {
       elements.stockSymbolInput.value = stock.symbol;
       loadStockDetail(stock.symbol, { focus: true, pushHistory: true });
     });
-
     elements.stockList.appendChild(fragment);
   });
 }
@@ -486,11 +447,9 @@ function polylinePoints(values, width, height, padding, min, max) {
   if (!values.length) {
     return "";
   }
-
   const rangeMin = Number.isFinite(min) ? min : Math.min(...values);
   const rangeMax = Number.isFinite(max) ? max : Math.max(...values);
   const range = rangeMax - rangeMin || 1;
-
   return values.map((value, index) => {
     const x = padding + (index * (width - padding * 2)) / Math.max(1, values.length - 1);
     const y = height - padding - ((value - rangeMin) / range) * (height - padding * 2);
@@ -521,28 +480,11 @@ function buildIndicatorSnapshot(detail) {
   const { range, window } = getRangeSeries(detail);
   const latestMacd = detail.latestIndicators.macd || {};
   const latestKdj = detail.latestIndicators.kdj || {};
-
   elements.indicatorSnapshot.innerHTML = [
-    {
-      label: `${range.label}收盤`,
-      value: window.close,
-      note: `成交量 ${formatNumber(window.volume, 0)}`
-    },
-    {
-      label: `${range.label}MACD`,
-      value: window.macdLine ?? latestMacd.macdLine,
-      note: `Signal ${formatNumber(window.signalLine ?? latestMacd.signalLine)}`
-    },
-    {
-      label: `${range.label}KD`,
-      value: window.k ?? latestKdj.k,
-      note: `D ${formatNumber(window.d ?? latestKdj.d)} / J ${formatNumber(window.j ?? latestKdj.j)}`
-    },
-    {
-      label: "圖表重點",
-      value: range.label,
-      note: "切換日期區間時，價格與技術圖表會同步更新。"
-    }
+    { label: `${range.label}收盤`, value: window.close, note: `成交量 ${formatNumber(window.volume, 0)}` },
+    { label: `${range.label}MACD`, value: window.macdLine ?? latestMacd.macdLine, note: `慢線 ${formatNumber(window.signalLine ?? latestMacd.signalLine)}` },
+    { label: `${range.label}KD`, value: window.k ?? latestKdj.k, note: `D ${formatNumber(window.d ?? latestKdj.d)}` },
+    { label: "圖表重點", value: range.label, note: "MACD 與 KD 已拆成兩張圖表。" }
   ].map((card) => `
     <div class="compact-indicator-card">
       <span>${card.label}</span>
@@ -550,6 +492,15 @@ function buildIndicatorSnapshot(detail) {
       <small>${card.note}</small>
     </div>
   `).join("");
+
+  elements.indicatorSnapshotDetail.innerHTML = `
+    <div class="chart-insights">
+      <div class="chart-stat"><span>MACD 快線</span><strong>${formatNumber(latestMacd.macdLine)}</strong></div>
+      <div class="chart-stat"><span>MACD 慢線</span><strong>${formatNumber(latestMacd.signalLine)}</strong></div>
+      <div class="chart-stat"><span>柱狀體</span><strong>${formatNumber(latestMacd.histogram)}</strong></div>
+      <div class="chart-stat"><span>K / D</span><strong>${formatNumber(latestKdj.k)} / ${formatNumber(latestKdj.d)}</strong></div>
+    </div>
+  `;
 }
 
 function renderRangeTabs() {
@@ -576,7 +527,6 @@ function renderPriceChart(detail) {
     elements.priceChart.innerHTML = "<p>目前沒有足夠的價格資料。</p>";
     return;
   }
-
   const width = 640;
   const height = 240;
   const padding = 24;
@@ -589,7 +539,6 @@ function renderPriceChart(detail) {
   const volumeMax = Math.max(...volumes, 1);
   const volumeAvg = average(volumes);
   const points = polylinePoints(closes, width, height, padding);
-
   const bars = candles.map((item, index) => {
     const x = padding + (index * (width - padding * 2)) / Math.max(1, candles.length - 1);
     const barWidth = Math.max(4, (width - padding * 2) / Math.max(candles.length * 2, 16));
@@ -597,25 +546,12 @@ function renderPriceChart(detail) {
     const y = height - padding - barHeight;
     return `<rect x="${x - barWidth / 2}" y="${y}" width="${barWidth}" height="${barHeight}" fill="rgba(44, 105, 209, 0.18)" rx="2" />`;
   }).join("");
-
   elements.priceChart.innerHTML = `
     <div class="chart-insights">
-      <div class="chart-stat">
-        <span>${range.label}收盤</span>
-        <strong>${formatNumber(window.close ?? closes.at(-1))}</strong>
-      </div>
-      <div class="chart-stat">
-        <span>${range.label}高 / 低</span>
-        <strong>${formatNumber(window.high ?? closeMax)} / ${formatNumber(window.low ?? closeMin)}</strong>
-      </div>
-      <div class="chart-stat">
-        <span>${range.label}成交量</span>
-        <strong>${formatNumber(window.volume ?? volumes.at(-1), 0)}</strong>
-      </div>
-      <div class="chart-stat">
-        <span>平均量</span>
-        <strong>${formatNumber(volumeAvg, 0)}</strong>
-      </div>
+      <div class="chart-stat"><span>${range.label}收盤</span><strong>${formatNumber(window.close ?? closes.at(-1))}</strong></div>
+      <div class="chart-stat"><span>${range.label}高 / 低</span><strong>${formatNumber(window.high ?? closeMax)} / ${formatNumber(window.low ?? closeMin)}</strong></div>
+      <div class="chart-stat"><span>${range.label}成交量</span><strong>${formatNumber(window.volume ?? volumes.at(-1), 0)}</strong></div>
+      <div class="chart-stat"><span>平均量</span><strong>${formatNumber(volumeAvg, 0)}</strong></div>
     </div>
     <div class="chart-legend">
       <span><i class="legend-dot legend-price"></i>收盤走勢</span>
@@ -623,11 +559,7 @@ function renderPriceChart(detail) {
       <span class="chart-caption">${dates[0]} 至 ${dates[dates.length - 1]}</span>
     </div>
     <div class="chart-svg-wrap">
-      <div class="chart-y-axis">
-        <span>${closeLabels.high}</span>
-        <span>${closeLabels.mid}</span>
-        <span>${closeLabels.low}</span>
-      </div>
+      <div class="chart-y-axis"><span>${closeLabels.high}</span><span>${closeLabels.mid}</span><span>${closeLabels.low}</span></div>
       <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${range.label}價格與成交量圖">
         <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.12)" />
         <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.08)" />
@@ -639,26 +571,21 @@ function renderPriceChart(detail) {
 }
 
 function renderIndicatorChart(detail) {
-  const { range, macd, kdj } = getRangeSeries(detail);
-  if (!macd.length && !kdj.length) {
-    elements.indicatorChart.innerHTML = "<p>目前沒有足夠的技術指標資料。</p>";
+  const { range, macd } = getRangeSeries(detail);
+  if (!macd.length) {
+    elements.indicatorChart.innerHTML = "<p>目前沒有足夠的 MACD 資料。</p>";
     return;
   }
-
   const width = 640;
   const height = 240;
   const padding = 24;
   const macdLine = macd.map((item) => Number(item.macdLine)).filter(Number.isFinite);
   const signalLine = macd.map((item) => Number(item.signalLine)).filter(Number.isFinite);
   const histogram = macd.map((item) => Number(item.histogram)).filter(Number.isFinite);
-  const kLine = kdj.map((item) => Number(item.k)).filter(Number.isFinite);
-  const dLine = kdj.map((item) => Number(item.d)).filter(Number.isFinite);
-  const jLine = kdj.map((item) => Number(item.j)).filter(Number.isFinite);
-  const source = [...macdLine, ...signalLine, ...histogram, ...kLine, ...dLine, ...jLine].filter(Number.isFinite);
+  const source = [...macdLine, ...signalLine, ...histogram].filter(Number.isFinite);
   const min = source.length ? Math.min(...source) : 0;
   const max = source.length ? Math.max(...source) : 100;
   const labels = axisLabels(min, max);
-
   const histogramBars = macd.map((item, index) => {
     const value = Number(item.histogram);
     if (!Number.isFinite(value)) {
@@ -671,48 +598,64 @@ function renderIndicatorChart(detail) {
     const barHeight = (Math.abs(value) / ((max - min) || 1)) * (height - padding * 2);
     return `<rect x="${x - barWidth / 2}" y="${barY}" width="${barWidth}" height="${barHeight}" fill="${value >= 0 ? "rgba(11,110,105,0.18)" : "rgba(212,106,31,0.18)"}" rx="2" />`;
   }).join("");
-
   elements.indicatorChart.innerHTML = `
     <div class="chart-insights">
-      <div class="chart-stat">
-        <span>${range.label}MACD</span>
-        <strong>${formatNumber(macd.at(-1)?.macdLine ?? detail.latestIndicators.macd?.macdLine)}</strong>
-      </div>
-      <div class="chart-stat">
-        <span>Signal / 柱狀體</span>
-        <strong>${formatNumber(macd.at(-1)?.signalLine ?? detail.latestIndicators.macd?.signalLine)} / ${formatNumber(macd.at(-1)?.histogram ?? detail.latestIndicators.macd?.histogram)}</strong>
-      </div>
-      <div class="chart-stat">
-        <span>${range.label}K / D</span>
-        <strong>${formatNumber(kdj.at(-1)?.k ?? detail.latestIndicators.kdj?.k)} / ${formatNumber(kdj.at(-1)?.d ?? detail.latestIndicators.kdj?.d)}</strong>
-      </div>
-      <div class="chart-stat">
-        <span>J 值</span>
-        <strong>${formatNumber(kdj.at(-1)?.j ?? detail.latestIndicators.kdj?.j)}</strong>
-      </div>
+      <div class="chart-stat"><span>${range.label}MACD</span><strong>${formatNumber(macd.at(-1)?.macdLine ?? detail.latestIndicators.macd?.macdLine)}</strong></div>
+      <div class="chart-stat"><span>MACD 慢線</span><strong>${formatNumber(macd.at(-1)?.signalLine ?? detail.latestIndicators.macd?.signalLine)}</strong></div>
+      <div class="chart-stat"><span>柱狀體</span><strong>${formatNumber(macd.at(-1)?.histogram ?? detail.latestIndicators.macd?.histogram)}</strong></div>
+      <div class="chart-stat"><span>區間</span><strong>${range.label}</strong></div>
     </div>
     <div class="chart-legend">
-      <span><i class="legend-dot legend-macd"></i>MACD</span>
-      <span><i class="legend-dot legend-signal"></i>Signal</span>
-      <span><i class="legend-dot legend-k"></i>K</span>
-      <span><i class="legend-dot legend-d"></i>D</span>
-      <span><i class="legend-dot legend-j"></i>J</span>
+      <span><i class="legend-dot legend-macd"></i>MACD 快線</span>
+      <span><i class="legend-dot legend-signal"></i>MACD 慢線</span>
+      <span><i class="legend-dot legend-volume"></i>柱狀體</span>
     </div>
     <div class="chart-svg-wrap">
-      <div class="chart-y-axis">
-        <span>${labels.high}</span>
-        <span>${labels.mid}</span>
-        <span>${labels.low}</span>
-      </div>
-      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${range.label}MACD 與 KDJ 圖">
+      <div class="chart-y-axis"><span>${labels.high}</span><span>${labels.mid}</span><span>${labels.low}</span></div>
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${range.label}MACD 圖">
         <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.12)" />
         <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.08)" />
         ${histogramBars}
         <polyline fill="none" stroke="#d46a1f" stroke-width="2.5" points="${polylinePoints(macdLine, width, height, padding, min, max)}" />
         <polyline fill="none" stroke="#2c69d1" stroke-width="2.5" points="${polylinePoints(signalLine, width, height, padding, min, max)}" />
-        <polyline fill="none" stroke="#0b6e69" stroke-width="2" points="${polylinePoints(kLine, width, height, padding, min, max)}" />
-        <polyline fill="none" stroke="#7a445f" stroke-width="2" points="${polylinePoints(dLine, width, height, padding, min, max)}" />
-        <polyline fill="none" stroke="#6b8f00" stroke-width="2" points="${polylinePoints(jLine, width, height, padding, min, max)}" />
+      </svg>
+    </div>
+  `;
+}
+
+function renderKdChart(detail) {
+  const { range, kdj } = getRangeSeries(detail);
+  if (!kdj.length) {
+    elements.kdChart.innerHTML = "<p>目前沒有足夠的 KD 資料。</p>";
+    return;
+  }
+  const width = 640;
+  const height = 240;
+  const padding = 24;
+  const kLine = kdj.map((item) => Number(item.k)).filter(Number.isFinite);
+  const dLine = kdj.map((item) => Number(item.d)).filter(Number.isFinite);
+  const source = [...kLine, ...dLine].filter(Number.isFinite);
+  const min = source.length ? Math.min(...source) : 0;
+  const max = source.length ? Math.max(...source) : 100;
+  const labels = axisLabels(min, max);
+  elements.kdChart.innerHTML = `
+    <div class="chart-insights">
+      <div class="chart-stat"><span>${range.label}K 值</span><strong>${formatNumber(kdj.at(-1)?.k ?? detail.latestIndicators.kdj?.k)}</strong></div>
+      <div class="chart-stat"><span>${range.label}D 值</span><strong>${formatNumber(kdj.at(-1)?.d ?? detail.latestIndicators.kdj?.d)}</strong></div>
+      <div class="chart-stat"><span>K / D</span><strong>${formatNumber(detail.latestIndicators.kdj?.k)} / ${formatNumber(detail.latestIndicators.kdj?.d)}</strong></div>
+      <div class="chart-stat"><span>交叉狀態</span><strong>${(detail.latestIndicators.kdj?.k ?? 0) >= (detail.latestIndicators.kdj?.d ?? 0) ? "K 在 D 上方" : "D 在 K 上方"}</strong></div>
+    </div>
+    <div class="chart-legend">
+      <span><i class="legend-dot legend-k"></i>K 線</span>
+      <span><i class="legend-dot legend-d"></i>D 線</span>
+    </div>
+    <div class="chart-svg-wrap">
+      <div class="chart-y-axis"><span>${labels.high}</span><span>${labels.mid}</span><span>${labels.low}</span></div>
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${range.label}KD 圖">
+        <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.12)" />
+        <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.08)" />
+        <polyline fill="none" stroke="#0b6e69" stroke-width="2.5" points="${polylinePoints(kLine, width, height, padding, min, max)}" />
+        <polyline fill="none" stroke="#7a445f" stroke-width="2.5" points="${polylinePoints(dLine, width, height, padding, min, max)}" />
       </svg>
     </div>
   `;
@@ -723,6 +666,7 @@ function renderDetailCharts(detail) {
   buildIndicatorSnapshot(detail);
   renderPriceChart(detail);
   renderIndicatorChart(detail);
+  renderKdChart(detail);
 }
 
 function renderDetail(detail) {
@@ -759,9 +703,8 @@ function renderDetail(detail) {
     return `<article class="horizon-score-card"><span>${item.label}</span><strong>${score.score} 分 ${stars(score.stars)}</strong><p>${score.biasLabel}</p></article>`;
   }).join("");
 
-  const activeHorizonScore = detail.horizonScores[state.horizon];
-  appendListItems(elements.detailBullishReasons, activeHorizonScore.bullishReasons, "目前沒有明確看漲因素。");
-  appendListItems(elements.detailRiskReasons, activeHorizonScore.riskReasons, "目前沒有明確風險提醒。");
+  appendListItems(elements.detailBullishReasons, detail.horizonScores[state.horizon].bullishReasons, "目前沒有明確看漲因素。");
+  appendListItems(elements.detailRiskReasons, detail.horizonScores[state.horizon].riskReasons, "目前沒有明確風險提醒。");
 
   elements.detailMetrics.innerHTML = [
     { label: "開盤", value: detail.quote.openPrice },
@@ -769,18 +712,9 @@ function renderDetail(detail) {
     { label: "最低", value: detail.quote.lowPrice },
     { label: "昨收", value: detail.quote.previousClose },
     { label: "成交量", value: detail.quote.tradeVolume, digits: 0 }
-  ].map((item) => `
-    <div class="metric-chip">
-      <span>${item.label}</span>
-      <strong>${formatNumber(item.value, item.digits ?? 2)}</strong>
-    </div>
-  `).join("");
+  ].map((item) => `<div class="metric-chip"><span>${item.label}</span><strong>${formatNumber(item.value, item.digits ?? 2)}</strong></div>`).join("");
 
-  bindFavoriteButton(elements.detailFavoriteButton, {
-    symbol: detail.symbol,
-    name: detail.quote.name || detail.symbol
-  });
-
+  bindFavoriteButton(elements.detailFavoriteButton, { symbol: detail.symbol, name: detail.quote.name || detail.symbol });
   renderDetailCharts(detail);
   setDetailState(`單股資料來源 ${detail.profile.universeSource} | 前端版本 ${BUILD_VERSION}`);
 }
@@ -798,11 +732,13 @@ function renderDetailError(message) {
   elements.detailHorizonScores.innerHTML = "";
   elements.detailMetrics.innerHTML = "";
   elements.indicatorSnapshot.innerHTML = "";
+  elements.indicatorSnapshotDetail.innerHTML = "";
   elements.detailRangeTabs.innerHTML = "";
   elements.detailBullishReasons.innerHTML = "";
   elements.detailRiskReasons.innerHTML = "";
   elements.priceChart.innerHTML = "<p>目前無法顯示價格圖表。</p>";
-  elements.indicatorChart.innerHTML = "<p>目前無法顯示技術圖表。</p>";
+  elements.indicatorChart.innerHTML = "<p>目前無法顯示 MACD 圖表。</p>";
+  elements.kdChart.innerHTML = "<p>目前無法顯示 KD 圖表。</p>";
   syncFavoriteButtons();
   setDetailState(message);
 }
@@ -856,10 +792,8 @@ async function loadStockDetail(symbol, options = {}) {
 }
 
 function goHome(options = {}) {
-  const { pushHistory = false } = options;
-  state.selectedSymbol = "";
   setViewMode("home", { scroll: true });
-  if (pushHistory) {
+  if (options.pushHistory) {
     syncHistory("");
   }
 }
@@ -882,16 +816,10 @@ elements.watchlistDrawer.addEventListener("click", (event) => {
 
 elements.addWatchlistButton.addEventListener("click", () => {
   const name = window.prompt("請輸入新的自選組合名稱", `自選${state.watchlists.length + 1}`);
-  if (!name) {
+  if (!name || !name.trim()) {
     return;
   }
-  const trimmedName = name.trim();
-  if (!trimmedName) {
-    elements.watchlistManagerState.textContent = "請輸入組合名稱。";
-    return;
-  }
-  createWatchlist(trimmedName);
-  elements.watchlistManagerState.textContent = `已新增「${trimmedName}」。`;
+  createWatchlist(name.trim());
 });
 
 elements.renameWatchlistButton.addEventListener("click", () => {
@@ -900,32 +828,20 @@ elements.renameWatchlistButton.addEventListener("click", () => {
     return;
   }
   const name = window.prompt("請輸入新的組合名稱", active.name);
-  if (!name) {
+  if (!name || !name.trim()) {
     return;
   }
-  const trimmedName = name.trim();
-  if (!trimmedName) {
-    elements.watchlistManagerState.textContent = "請輸入新的組合名稱。";
-    return;
-  }
-  renameActiveWatchlist(trimmedName);
-  elements.watchlistManagerState.textContent = `已改名為「${trimmedName}」。`;
+  renameActiveWatchlist(name.trim());
 });
 
 elements.deleteWatchlistButton.addEventListener("click", () => {
   const active = getActiveWatchlist();
-  if (!active) {
-    return;
+  if (active && window.confirm(`確定要刪除「${active.name}」嗎？`)) {
+    deleteActiveWatchlist();
   }
-  if (!window.confirm(`確定要刪除「${active.name}」嗎？`)) {
-    return;
-  }
-  deleteActiveWatchlist();
 });
 
-elements.backToHomeButton.addEventListener("click", () => {
-  goHome({ pushHistory: true });
-});
+elements.backToHomeButton.addEventListener("click", () => goHome({ pushHistory: true }));
 
 elements.stockSearchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -942,9 +858,9 @@ window.addEventListener("popstate", () => {
   if (symbol) {
     elements.stockSymbolInput.value = symbol;
     loadStockDetail(symbol, { focus: true, pushHistory: false });
-    return;
+  } else {
+    goHome({ pushHistory: false });
   }
-  goHome({ pushHistory: false });
 });
 
 async function bootstrap() {
@@ -953,14 +869,12 @@ async function bootstrap() {
   renderWatchlistDrawer();
   await loadSectors();
   await loadAnalysis();
-
   const symbolFromUrl = new URL(window.location.href).searchParams.get("stock");
   if (symbolFromUrl) {
     elements.stockSymbolInput.value = symbolFromUrl;
     await loadStockDetail(symbolFromUrl, { focus: true, pushHistory: false });
     return;
   }
-
   elements.stockSymbolInput.value = "2330";
   loadStockDetail("2330");
 }
