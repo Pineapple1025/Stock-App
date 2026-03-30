@@ -8,7 +8,7 @@ const HORIZONS = {
 };
 
 const RANGE_OPTIONS = [
-  { key: "1d", label: "當日", count: 1 },
+  { key: "1d", label: "當日", count: 1, chartCount: 20 },
   { key: "3d", label: "三日", count: 3 },
   { key: "5d", label: "五日", count: 5 },
   { key: "1m", label: "近月", count: 22 },
@@ -36,7 +36,8 @@ const state = {
   searchSuggestions: [],
   searchActiveIndex: -1,
   searchSelectedSymbol: "",
-  searchDebounceId: null
+  searchDebounceId: null,
+  detailAutoRefreshId: null
 };
 
 const elements = {
@@ -152,6 +153,7 @@ function setViewMode(view, options = {}) {
   document.body.classList.toggle("single-stock-mode", view === "detail");
   document.body.classList.toggle("home-mode", view !== "detail");
   elements.backToHomeButton.hidden = view !== "detail";
+  syncDetailAutoRefresh();
   if (view === "detail" && options.scroll !== false) {
     elements.detailCard.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -550,21 +552,124 @@ function polylinePoints(values, width, height, padding, min, max) {
   }).join(" ");
 }
 
-function axisLabels(min, max) {
+function buildChartScale(values, options = {}) {
+  const numericValues = (values || []).filter(Number.isFinite);
+  const ticks = options.ticks || 5;
+
+  if (!numericValues.length) {
+    const fallbackMin = Number(options.fallbackMin ?? 0);
+    const fallbackMax = Number(options.fallbackMax ?? 100);
+    return {
+      min: fallbackMin,
+      max: fallbackMax,
+      labels: axisLabels(fallbackMin, fallbackMax, ticks)
+    };
+  }
+
+  let min = Math.min(...numericValues);
+  let max = Math.max(...numericValues);
+
+  if (Number.isFinite(options.min)) {
+    min = options.min;
+  }
+  if (Number.isFinite(options.max)) {
+    max = options.max;
+  }
+
+  if (min === max) {
+    const delta = Math.abs(min || 1) * 0.02 || 1;
+    min -= delta;
+    max += delta;
+  } else {
+    const paddingRatio = Number.isFinite(options.paddingRatio) ? options.paddingRatio : 0.08;
+    const paddingValue = (max - min) * paddingRatio;
+    min -= paddingValue;
+    max += paddingValue;
+  }
+
   return {
-    high: formatNumber(max),
-    mid: formatNumber((min + max) / 2),
-    low: formatNumber(min)
+    min,
+    max,
+    labels: axisLabels(min, max, ticks)
   };
+}
+
+function axisLabels(min, max, ticks = 5) {
+  const safeTicks = Math.max(2, ticks);
+  const step = (max - min) / (safeTicks - 1 || 1);
+  const labels = Array.from({ length: safeTicks }, (_, index) => formatNumber(max - step * index));
+  return {
+    high: labels[0],
+    mid: labels[Math.floor((safeTicks - 1) / 2)],
+    low: labels[labels.length - 1],
+    all: labels
+  };
+}
+
+function renderChartYAxis(labels) {
+  return labels.map((label) => `<span>${label}</span>`).join("");
+}
+
+function renderChartGridLines(width, height, padding, tickCount) {
+  return Array.from({ length: tickCount }, (_, index) => {
+    const y = padding + (index * (height - padding * 2)) / Math.max(1, tickCount - 1);
+    return `<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" stroke="rgba(16,24,40,0.08)" stroke-dasharray="4 6" />`;
+  }).join("");
+}
+
+function buildXAxisLabels(items, formatter) {
+  if (!Array.isArray(items) || !items.length) {
+    return { start: "-", middle: "-", end: "-" };
+  }
+  const middleIndex = Math.floor((items.length - 1) / 2);
+  return {
+    start: formatter(items[0]),
+    middle: formatter(items[middleIndex]),
+    end: formatter(items[items.length - 1])
+  };
+}
+
+function renderChartXAxis(labels) {
+  return `
+    <div class="chart-x-axis">
+      <span>${labels.start}</span>
+      <span>${labels.middle}</span>
+      <span>${labels.end}</span>
+    </div>
+  `;
+}
+
+function formatChartDateLabel(value) {
+  if (!value) {
+    return "-";
+  }
+  const text = String(value);
+  return text.length >= 10 ? text.slice(5) : text;
+}
+
+function syncDetailAutoRefresh() {
+  if (state.detailAutoRefreshId) {
+    clearInterval(state.detailAutoRefreshId);
+    state.detailAutoRefreshId = null;
+  }
+
+  if (state.view !== "detail" || !state.selectedSymbol || state.detailRange !== "1d") {
+    return;
+  }
+
+  state.detailAutoRefreshId = window.setInterval(() => {
+    loadStockDetail(state.selectedSymbol, { focus: false, pushHistory: false, silent: true });
+  }, 60000);
 }
 
 function getRangeSeries(detail) {
   const range = getRangeOption(state.detailRange);
+  const chartCount = range.chartCount || range.count;
   return {
     range,
-    candles: takeLast(detail.series.candles || [], range.count),
-    macd: takeLast(detail.series.macd || [], range.count),
-    kdj: takeLast(detail.series.kdj || [], range.count),
+    candles: takeLast(detail.series.candles || [], chartCount),
+    macd: takeLast(detail.series.macd || [], chartCount),
+    kdj: takeLast(detail.series.kdj || [], chartCount),
     window: detail.windows?.[range.key] || {}
   };
 }
@@ -606,6 +711,7 @@ function renderRangeTabs() {
     button.classList.toggle("active", option.key === state.detailRange);
     button.addEventListener("click", () => {
       state.detailRange = option.key;
+      syncDetailAutoRefresh();
       if (state.detail) {
         renderDetailCharts(state.detail);
       }
@@ -626,12 +732,14 @@ function renderPriceChart(detail) {
   const closes = candles.map((item) => Number(item.close)).filter(Number.isFinite);
   const volumes = candles.map((item) => Number(item.volume)).filter(Number.isFinite);
   const dates = candles.map((item) => item.date);
-  const closeMin = Math.min(...closes);
-  const closeMax = Math.max(...closes);
-  const closeLabels = axisLabels(closeMin, closeMax);
+  const closeScale = buildChartScale(closes, { ticks: 5, paddingRatio: 0.06 });
+  const closeMin = closeScale.min;
+  const closeMax = closeScale.max;
+  const closeLabels = closeScale.labels;
   const volumeMax = Math.max(...volumes, 1);
   const volumeAvg = average(volumes);
-  const points = polylinePoints(closes, width, height, padding);
+  const points = polylinePoints(closes, width, height, padding, closeMin, closeMax);
+  const xAxisLabels = buildXAxisLabels(dates, formatChartDateLabel);
   const bars = candles.map((item, index) => {
     const x = padding + (index * (width - padding * 2)) / Math.max(1, candles.length - 1);
     const barWidth = Math.max(4, (width - padding * 2) / Math.max(candles.length * 2, 16));
@@ -652,13 +760,16 @@ function renderPriceChart(detail) {
       <span class="chart-caption">${dates[0]} 至 ${dates[dates.length - 1]}</span>
     </div>
     <div class="chart-svg-wrap">
-      <div class="chart-y-axis"><span>${closeLabels.high}</span><span>${closeLabels.mid}</span><span>${closeLabels.low}</span></div>
-      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${range.label}價格與成交量圖">
-        <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.12)" />
-        <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.08)" />
-        ${bars}
-        <polyline fill="none" stroke="#0b6e69" stroke-width="3" points="${points}" />
-      </svg>
+      <div class="chart-y-axis">${renderChartYAxis(closeLabels.all)}</div>
+      <div>
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${range.label}價格與成交量圖">
+          ${renderChartGridLines(width, height, padding, closeLabels.all.length)}
+          <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.08)" />
+          ${bars}
+          <polyline fill="none" stroke="#0b6e69" stroke-width="3" points="${points}" />
+        </svg>
+        ${renderChartXAxis(xAxisLabels)}
+      </div>
     </div>
   `;
 }
@@ -676,9 +787,11 @@ function renderIndicatorChart(detail) {
   const signalLine = macd.map((item) => Number(item.signalLine)).filter(Number.isFinite);
   const histogram = macd.map((item) => Number(item.histogram)).filter(Number.isFinite);
   const source = [...macdLine, ...signalLine, ...histogram].filter(Number.isFinite);
-  const min = source.length ? Math.min(...source) : 0;
-  const max = source.length ? Math.max(...source) : 100;
-  const labels = axisLabels(min, max);
+  const scale = buildChartScale(source, { ticks: 5, paddingRatio: 0.1, fallbackMin: -1, fallbackMax: 1 });
+  const min = scale.min;
+  const max = scale.max;
+  const labels = scale.labels;
+  const xAxisLabels = buildXAxisLabels(macd, (item) => formatChartDateLabel(item?.date));
   const histogramBars = macd.map((item, index) => {
     const value = Number(item.histogram);
     if (!Number.isFinite(value)) {
@@ -704,14 +817,17 @@ function renderIndicatorChart(detail) {
       <span><i class="legend-dot legend-volume"></i>柱狀體</span>
     </div>
     <div class="chart-svg-wrap">
-      <div class="chart-y-axis"><span>${labels.high}</span><span>${labels.mid}</span><span>${labels.low}</span></div>
-      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${range.label}MACD 圖">
-        <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.12)" />
-        <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.08)" />
-        ${histogramBars}
-        <polyline fill="none" stroke="#d46a1f" stroke-width="2.5" points="${polylinePoints(macdLine, width, height, padding, min, max)}" />
-        <polyline fill="none" stroke="#2c69d1" stroke-width="2.5" points="${polylinePoints(signalLine, width, height, padding, min, max)}" />
-      </svg>
+      <div class="chart-y-axis">${renderChartYAxis(labels.all)}</div>
+      <div>
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${range.label}MACD 圖">
+          ${renderChartGridLines(width, height, padding, labels.all.length)}
+          <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.08)" />
+          ${histogramBars}
+          <polyline fill="none" stroke="#d46a1f" stroke-width="2.5" points="${polylinePoints(macdLine, width, height, padding, min, max)}" />
+          <polyline fill="none" stroke="#2c69d1" stroke-width="2.5" points="${polylinePoints(signalLine, width, height, padding, min, max)}" />
+        </svg>
+        ${renderChartXAxis(xAxisLabels)}
+      </div>
     </div>
   `;
 }
@@ -728,9 +844,11 @@ function renderKdChart(detail) {
   const kLine = kdj.map((item) => Number(item.k)).filter(Number.isFinite);
   const dLine = kdj.map((item) => Number(item.d)).filter(Number.isFinite);
   const source = [...kLine, ...dLine].filter(Number.isFinite);
-  const min = source.length ? Math.min(...source) : 0;
-  const max = source.length ? Math.max(...source) : 100;
-  const labels = axisLabels(min, max);
+  const scale = buildChartScale(source, { ticks: 5, paddingRatio: 0.08, fallbackMin: 0, fallbackMax: 100 });
+  const min = scale.min;
+  const max = scale.max;
+  const labels = scale.labels;
+  const xAxisLabels = buildXAxisLabels(kdj, (item) => formatChartDateLabel(item?.date));
   elements.kdChart.innerHTML = `
     <div class="chart-insights">
       <div class="chart-stat"><span>${range.label}K 值</span><strong>${formatNumber(kdj.at(-1)?.k ?? detail.latestIndicators.kdj?.k)}</strong></div>
@@ -743,13 +861,16 @@ function renderKdChart(detail) {
       <span><i class="legend-dot legend-d"></i>D 線</span>
     </div>
     <div class="chart-svg-wrap">
-      <div class="chart-y-axis"><span>${labels.high}</span><span>${labels.mid}</span><span>${labels.low}</span></div>
-      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${range.label}KD 圖">
-        <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.12)" />
-        <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.08)" />
-        <polyline fill="none" stroke="#0b6e69" stroke-width="2.5" points="${polylinePoints(kLine, width, height, padding, min, max)}" />
-        <polyline fill="none" stroke="#7a445f" stroke-width="2.5" points="${polylinePoints(dLine, width, height, padding, min, max)}" />
-      </svg>
+      <div class="chart-y-axis">${renderChartYAxis(labels.all)}</div>
+      <div>
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${range.label}KD 圖">
+          ${renderChartGridLines(width, height, padding, labels.all.length)}
+          <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="rgba(16,24,40,0.08)" />
+          <polyline fill="none" stroke="#0b6e69" stroke-width="2.5" points="${polylinePoints(kLine, width, height, padding, min, max)}" />
+          <polyline fill="none" stroke="#7a445f" stroke-width="2.5" points="${polylinePoints(dLine, width, height, padding, min, max)}" />
+        </svg>
+        ${renderChartXAxis(xAxisLabels)}
+      </div>
     </div>
   `;
 }
@@ -818,6 +939,7 @@ function renderDetail(detail) {
 
   bindFavoriteButton(elements.detailFavoriteButton, { symbol: detail.symbol, name: detail.quote.name || detail.symbol });
   renderDetailCharts(detail);
+  syncDetailAutoRefresh();
   setDetailState(`單股資料來源 ${detail.profile.universeSource} | 前端版本 ${BUILD_VERSION}`);
 }
 
@@ -842,6 +964,7 @@ function renderDetailError(message) {
   elements.indicatorChart.innerHTML = "<p>目前無法顯示 MACD 圖表。</p>";
   elements.kdChart.innerHTML = "<p>目前無法顯示 KD 圖表。</p>";
   syncFavoriteButtons();
+  syncDetailAutoRefresh();
   setDetailState(message);
 }
 
@@ -874,8 +997,10 @@ async function loadAnalysis() {
 }
 
 async function loadStockDetail(symbol, options = {}) {
-  const { focus = false, pushHistory = false } = options;
-  renderDetailLoading(symbol);
+  const { focus = false, pushHistory = false, silent = false } = options;
+  if (!silent) {
+    renderDetailLoading(symbol);
+  }
   try {
     const detail = await fetchJson(`/api/stock/${symbol}`);
     renderDetail(detail);
@@ -898,6 +1023,7 @@ function goHome(options = {}) {
   if (options.pushHistory) {
     syncHistory("");
   }
+  syncDetailAutoRefresh();
 }
 
 elements.refreshButton.addEventListener("click", () => {
